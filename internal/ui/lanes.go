@@ -170,14 +170,19 @@ func (l lane) render(width, sel int, deco decoFunc) laneView {
 		if bd.marked {
 			badge = markGlyph + " " + badge
 		}
-		name := ansi.Truncate(b.Name, max(inner-6, 1), "…")
+		pr := prPill(b)
+		name := ansi.Truncate(b.Name, max(inner-6-ansi.StringWidth(pr), 1), "…")
 		if item == sel {
 			focused, selLine = true, len(out)+1
 			name = selectedStyle.Render(name)
 		} else {
 			name = headerStyle.Render(name)
 		}
-		body = append(body, dimmed(withTag(badge+" "+name, inner, bd), bd), "")
+		header := badge + " " + name
+		if pr != "" && bd.tag == "" && !bd.source {
+			header += strings.Repeat(" ", max(inner-ansi.StringWidth(header)-ansi.StringWidth(pr), 1)) + pr
+		}
+		body = append(body, dimmed(withTag(header, inner, bd), bd), "")
 		item++
 
 		if len(b.Commits) == 0 {
@@ -292,6 +297,28 @@ func (l lane) renderPhantom(width, sel int, deco decoFunc) laneView {
 		selLine = 1
 	}
 	return laneView{lines: block, items: hits, selLine: selLine}
+}
+
+// prPill shows a branch's pull request and the state of its checks: "#3 ✓".
+func prPill(b but.Branch) string {
+	pr := b.PR()
+	if pr == "" {
+		return ""
+	}
+	st := mutedStyle
+	if b.BranchStatus == "integrated" {
+		st, pr = lipgloss.NewStyle().Foreground(colorAccent), pr+" merged"
+	} else if b.CI != nil {
+		switch {
+		case len(b.CI.FailingCheckTitles) > 0 || b.CI.Conclusion == "failure":
+			st, pr = errorStyle, pr+" ✗"
+		case len(b.CI.PendingCheckTitles) > 0 || b.CI.Status == "queued" || b.CI.Status == "inProgress":
+			st, pr = lipgloss.NewStyle().Foreground(colorMod), pr+" ●"
+		case b.CI.Conclusion == "success" || len(b.CI.PassingCheckTitles) > 0:
+			st, pr = lipgloss.NewStyle().Foreground(colorAdd), pr+" ✓"
+		}
+	}
+	return st.Render(pr)
 }
 
 func canPush(status string) bool {

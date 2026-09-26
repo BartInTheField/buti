@@ -48,6 +48,22 @@ type Branch struct {
 	Commits         []Commit `json:"commits"`
 	UpstreamCommits []Commit `json:"upstreamCommits"`
 	BranchStatus    string   `json:"branchStatus"`
+	ReviewID        string   `json:"reviewId"` // e.g. "(#3)", empty without a pull request
+	CI              *CI      `json:"ci"`
+}
+
+// PR returns the pull request label, e.g. "#3", or "" when the branch has none.
+func (b Branch) PR() string {
+	return strings.Trim(b.ReviewID, "()")
+}
+
+// CI is the state of the checks on a branch's pull request.
+type CI struct {
+	PendingCheckTitles []string `json:"pendingCheckTitles"`
+	PassingCheckTitles []string `json:"passingCheckTitles"`
+	FailingCheckTitles []string `json:"failingCheckTitles"`
+	Status             string   `json:"status"`     // "queued", "inProgress" or "complete"
+	Conclusion         string   `json:"conclusion"` // "success", "failure", ... or "unknown" without checks
 }
 
 type Stack struct {
