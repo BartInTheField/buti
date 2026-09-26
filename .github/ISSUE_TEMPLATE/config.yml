@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: GitButler CLI (`but`) issues
+    url: https://github.com/gitbutlerapp/gitbutler/issues
+    about: Problems that also happen with the plain `but` command belong to GitButler.
