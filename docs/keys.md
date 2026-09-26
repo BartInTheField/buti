@@ -26,7 +26,7 @@
 | `o` / `O` | open a file in `$EDITOR` / with the default app; `o` on a branch with a pull request opens it in the browser |
 | `/` / `t` | go to anything (fuzzy) / go to a branch |
 | `:` / `!` | run a `but` command (the output is shown) / a shell command |
-| `ctrl+p` | command palette |
+| `ctrl+p` | command palette (also holds commands without a key: **Version**, **Update buti**) |
 | `j` `k` `h` `l` · `J` `K` · `g` `G` | move · next/previous branch · top/bottom |
 | `esc` | back: leave the mode, clear marks, close details |
 | `ctrl+r` · `q` | reload (it also polls every 3 seconds) · quit |

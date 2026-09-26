@@ -44,10 +44,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	opts := ui.Options{Target: flag.Arg(0), ShowDetails: *diff}
+	opts := ui.Options{Target: flag.Arg(0), ShowDetails: *diff, Version: version}
 	// Builds without a release version (go run, go install) have nothing to update to.
-	if version != "dev" && os.Getenv("BUTI_NO_UPDATE_CHECK") == "" {
-		opts.Version = version
+	if version != "dev" {
+		opts.UpdateCheck = os.Getenv("BUTI_NO_UPDATE_CHECK") == ""
 		opts.UpdateCache = updateCache()
 	}
 	if *remember {

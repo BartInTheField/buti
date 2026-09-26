@@ -1,11 +1,15 @@
 package ui
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/bartinthefield/buti/internal/update"
 )
 
 func TestClickSelects(t *testing.T) {
@@ -276,5 +280,74 @@ func TestUpdateOffered(t *testing.T) {
 	h.keys("esc")
 	if h.m.modal != nil {
 		t.Fatal("esc should dismiss the prompt")
+	}
+}
+
+// fakeLatest points the update check at a server whose latest release is version.
+func fakeLatest(t *testing.T, version string) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/releases/tag/"+version)
+		w.WriteHeader(http.StatusFound)
+	}))
+	t.Cleanup(srv.Close)
+	old := update.BaseURL
+	update.BaseURL = srv.URL
+	t.Cleanup(func() { update.BaseURL = old })
+}
+
+func TestManualUpdateCheck(t *testing.T) {
+	h := newHarness(t)
+	h.m.opts.Version = "2026.09.26.1"
+	fakeLatest(t, "2026.09.26.2")
+	h.keys("?")
+	h.typeText("update buti")
+	h.keys("enter")
+	if _, ok := h.m.modal.(*confirmModal); !ok {
+		t.Fatalf("expected an update prompt, got %T", h.m.modal)
+	}
+	if !strings.Contains(h.screen(), "2026.09.26.2 is available") {
+		t.Fatal("prompt should name the new version")
+	}
+}
+
+func TestManualUpdateCheckUpToDate(t *testing.T) {
+	h := newHarness(t)
+	h.m.opts.Version = "2026.09.26.2"
+	fakeLatest(t, "2026.09.26.2")
+	h.keys("?")
+	h.typeText("update buti")
+	h.keys("enter")
+	if h.m.modal != nil {
+		t.Fatalf("no prompt expected when up to date, got %T", h.m.modal)
+	}
+	if !strings.Contains(h.screen(), "2026.09.26.2 is the latest version") {
+		t.Fatal("should say buti is up to date")
+	}
+}
+
+func TestManualUpdateCheckDevBuild(t *testing.T) {
+	h := newHarness(t)
+	h.keys("?")
+	h.typeText("update buti")
+	h.keys("enter")
+	if !strings.Contains(h.screen(), "Development builds can't update themselves") {
+		t.Fatal("a dev build should explain it can't update")
+	}
+}
+
+func TestShowVersion(t *testing.T) {
+	for _, tc := range []struct{ version, want string }{
+		{"2026.09.26.1", "buti 2026.09.26.1"},
+		{"dev", "buti development build (dev)"},
+	} {
+		h := newHarness(t)
+		h.m.opts.Version = tc.version
+		h.keys("?")
+		h.typeText("version")
+		h.keys("enter")
+		if !strings.Contains(h.screen(), tc.want) {
+			t.Errorf("version %q: want %q on screen", tc.version, tc.want)
+		}
 	}
 }

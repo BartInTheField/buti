@@ -216,6 +216,8 @@ func init() {
 		{key: "!", title: "Run a shell command…", group: "View", global: true, resolving: true, when: always, run: (*Model).shellPrompt},
 		{key: "ctrl+r", title: "Reload", group: "View", global: true, resolving: true, when: always,
 			run: func(m *Model, _ []entity) tea.Cmd { return tea.Batch(m.fetchStatus(), m.syncDetails(true)) }},
+		{title: "Version", group: "View", global: true, resolving: true, when: always, run: (*Model).showVersion},
+		{title: "Update buti", group: "View", global: true, resolving: true, when: always, run: (*Model).checkUpdateNow},
 		{key: ".", title: "Actions for selection…", group: "View", global: true, resolving: true, when: always, run: (*Model).contextMenu},
 		{key: "?", title: "Help & all commands", group: "View", global: true, resolving: true, when: always, run: (*Model).helpPalette},
 		{key: "ctrl+p", title: "Command palette", group: "View", global: true, resolving: true, when: always, run: (*Model).palette},

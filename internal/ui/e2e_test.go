@@ -131,6 +131,8 @@ func TestE2EWorkspace(t *testing.T) {
 
 	h.keys("?")
 	h.snap("help")
+	h.typeText("u")
+	h.snap("help-search")
 	h.keys("esc", "ctrl+p")
 	h.snap("palette")
 }
