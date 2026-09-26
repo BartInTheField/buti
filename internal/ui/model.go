@@ -189,9 +189,6 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 	case updateNoticeMsg:
 		return m.notify(msg.kind, msg.text)
 
-	case updateStartedMsg:
-		return m.notify(toastInfo, "Updating to "+msg.version+"…")
-
 	case updateDoneMsg:
 		return m.handleUpdateDone(msg)
 

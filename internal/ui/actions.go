@@ -156,7 +156,7 @@ func init() {
 				b := sel[0].branch
 				m.openModal(&confirmModal{title: "Land " + b + "?", yesLabel: "land",
 					body: "Merges " + b + " straight into the target branch and pushes it.",
-					onYes: func() tea.Cmd {
+					onYes: func(m *Model) tea.Cmd {
 						return m.runOp("Land "+b, selectArea, func(ctx context.Context, c *but.Client) error {
 							_, err := c.Exec(ctx, "land", b, "--yes")
 							return err
@@ -279,7 +279,7 @@ func describeSel(sel []entity) string {
 }
 
 func (m *Model) palette(sel []entity) tea.Cmd {
-	m.openModal(newPicker("Command palette", actionItems(m.available(sel, true)), m.runPicked))
+	m.openModal(newPicker("Command palette", actionItems(m.available(sel, true)), (*Model).runPicked))
 	return nil
 }
 
@@ -288,7 +288,7 @@ func (m *Model) contextMenu(sel []entity) tea.Cmd {
 	if len(as) == 0 {
 		return m.notify(toastInfo, "No actions for "+describeSel(sel))
 	}
-	p := newPicker("Actions · "+describeSel(sel), actionItems(as), m.runPicked)
+	p := newPicker("Actions · "+describeSel(sel), actionItems(as), (*Model).runPicked)
 	p.maxRows = 20
 	m.openModal(p)
 	return nil
@@ -307,7 +307,7 @@ func (m *Model) helpPalette(sel []entity) tea.Cmd {
 	for _, n := range navHelp {
 		items = append(items, pickItem{label: "Navigate · " + n[1], detail: n[0]})
 	}
-	p := newPicker("Help · type to search, enter runs", items, m.runPicked)
+	p := newPicker("Help · type to search, enter runs", items, (*Model).runPicked)
 	p.maxRows = 24
 	m.openModal(p)
 	return nil
@@ -387,7 +387,7 @@ func (m *Model) branchHasCommits(e entity) bool {
 func (m *Model) reword(sel []entity) tea.Cmd {
 	e := sel[0]
 	if e.kind == entBranch {
-		m.openModal(newPrompt("Rename branch", e.branch, "branch-name", "Spaces become dashes.", func(name string) tea.Cmd {
+		m.openModal(newPrompt("Rename branch", e.branch, "branch-name", "Spaces become dashes.", func(m *Model, name string) tea.Cmd {
 			name = strings.Join(strings.Fields(name), "-")
 			if name == "" || name == e.branch {
 				return nil
@@ -399,7 +399,7 @@ func (m *Model) reword(sel []entity) tea.Cmd {
 		m.pendingKey = "branch:" + e.branch // updated on submit
 		return nil
 	}
-	return m.openComposer(composeReword, "Reword "+e.describe(), e.commit.Message, func(msg string) tea.Cmd {
+	return m.openComposer(composeReword, "Reword "+e.describe(), e.commit.Message, func(m *Model, msg string) tea.Cmd {
 		if strings.TrimSpace(msg) == strings.TrimSpace(e.commit.Message) {
 			return nil
 		}
@@ -438,7 +438,7 @@ func (m *Model) discard(sel []entity) tea.Cmd {
 		title, body = "Discard "+e.describe()+"?", "The uncommitted changes are thrown away."
 	}
 	body += "\n\n" + mutedStyle.Render("You can bring it back with undo (u).")
-	m.openModal(&confirmModal{title: title, body: body, yesLabel: "discard", onYes: func() tea.Cmd {
+	m.openModal(&confirmModal{title: title, body: body, yesLabel: "discard", onYes: func(m *Model) tea.Cmd {
 		return m.runOp(strings.TrimSuffix(title, "?"), keepSelection, func(ctx context.Context, c *but.Client) error {
 			return c.Discard(ctx, ids)
 		})
@@ -491,7 +491,7 @@ func (m *Model) newBranch(sel []entity) tea.Cmd {
 }
 
 func (m *Model) promptNewBranch(at but.Placement, where string) tea.Cmd {
-	m.openModal(newPrompt("New branch "+where, "", "leave empty for a generated name", "Spaces become dashes.", func(name string) tea.Cmd {
+	m.openModal(newPrompt("New branch "+where, "", "leave empty for a generated name", "Spaces become dashes.", func(m *Model, name string) tea.Cmd {
 		name = strings.Join(strings.Fields(name), "-")
 		return m.runOp("Create branch "+name, selectNew, func(ctx context.Context, c *but.Client) error {
 			return c.BranchNew(ctx, name, at)
@@ -513,15 +513,15 @@ func (m *Model) push(sel []entity) tea.Cmd {
 	if status == "nothingToPush" || status == "integrated" {
 		return m.notify(toastInfo, b+" has nothing to push")
 	}
-	run := func(force bool) tea.Cmd {
+	run := func(m *Model, force bool) tea.Cmd {
 		return m.runOp("Push "+b, keepSelection, func(ctx context.Context, c *but.Client) error { return c.Push(ctx, b, force) })
 	}
 	if status == "unpushedCommitsRequiringForce" {
 		m.openModal(&confirmModal{title: "Force push " + b + "?", yesLabel: "force push",
-			body: "The remote branch has diverged; pushing rewrites it.", onYes: func() tea.Cmd { return run(true) }})
+			body: "The remote branch has diverged; pushing rewrites it.", onYes: func(m *Model) tea.Cmd { return run(m, true) }})
 		return nil
 	}
-	return run(false)
+	return run(m, false)
 }
 
 func (m *Model) applyPicker([]entity) tea.Cmd {
@@ -555,7 +555,7 @@ func (m *Model) showApplyPicker(msg branchesMsg) tea.Cmd {
 		}
 		items = append(items, pickItem{label: b.Name, detail: detail, value: b.Name})
 	}
-	p := newPicker("Apply branch", items, func(it pickItem) tea.Cmd {
+	p := newPicker("Apply branch", items, func(m *Model, it pickItem) tea.Cmd {
 		name := it.value.(string)
 		return m.runOp("Apply "+name, selectNew, func(ctx context.Context, c *but.Client) error { return c.Apply(ctx, name) })
 	})
@@ -604,11 +604,11 @@ func (m *Model) showOplog(msg oplogMsg) tea.Cmd {
 		}
 		items = append(items, pickItem{label: humanizeOp(title), detail: e.ID[:7] + " · " + relTime(time.UnixMilli(e.CreatedAt)), value: e})
 	}
-	p := newPicker("Operation history · enter restores", items, func(it pickItem) tea.Cmd {
+	p := newPicker("Operation history · enter restores", items, func(m *Model, it pickItem) tea.Cmd {
 		e := it.value.(but.OplogEntry)
 		m.openModal(&confirmModal{title: "Restore to before “" + humanizeOp(e.Details.Title) + "”?", yesLabel: "restore",
 			body: "The workspace goes back to snapshot " + e.ID[:7] + ". This is itself recorded, so it can be undone.",
-			onYes: func() tea.Cmd {
+			onYes: func(m *Model) tea.Cmd {
 				return m.runOp("Restore snapshot "+e.ID[:7], keepSelection, func(ctx context.Context, c *but.Client) error {
 					return c.OplogRestore(ctx, e.ID)
 				})
@@ -689,7 +689,7 @@ func (m *Model) copyPicker(sel []entity) tea.Cmd {
 		add("Relative path", e.label)
 		add("Short ID", e.id)
 	}
-	m.openModal(newPicker("Copy", items, func(it pickItem) tea.Cmd {
+	m.openModal(newPicker("Copy", items, func(m *Model, it pickItem) tea.Cmd {
 		return tea.Batch(tea.SetClipboard(it.value.(string)), m.notify(toastSuccess, "Copied "+strings.ToLower(it.label)))
 	}))
 	return nil
@@ -718,7 +718,7 @@ func (m *Model) gotoPicker([]entity) tea.Cmd {
 			}
 		}
 	}
-	m.openModal(newPicker("Go to", items, func(it pickItem) tea.Cmd { return m.selectEntity(it.value.(entity)) }))
+	m.openModal(newPicker("Go to", items, func(m *Model, it pickItem) tea.Cmd { return m.selectEntity(it.value.(entity)) }))
 	return nil
 }
 
@@ -731,12 +731,12 @@ func (m *Model) branchPicker([]entity) tea.Cmd {
 			}
 		}
 	}
-	m.openModal(newPicker("Go to branch", items, func(it pickItem) tea.Cmd { return m.selectEntity(it.value.(entity)) }))
+	m.openModal(newPicker("Go to branch", items, func(m *Model, it pickItem) tea.Cmd { return m.selectEntity(it.value.(entity)) }))
 	return nil
 }
 
 func (m *Model) butPrompt([]entity) tea.Cmd {
-	m.openModal(newPrompt("Run a but command", "", "e.g. branch list", "Runs in the repository; output is shown afterwards.", func(line string) tea.Cmd {
+	m.openModal(newPrompt("Run a but command", "", "e.g. branch list", "Runs in the repository; output is shown afterwards.", func(m *Model, line string) tea.Cmd {
 		args, err := splitArgs(strings.TrimPrefix(strings.TrimSpace(line), "but "))
 		if err != nil {
 			return m.notify(toastError, err.Error())
@@ -759,7 +759,7 @@ type commandMsg struct {
 }
 
 func (m *Model) shellPrompt([]entity) tea.Cmd {
-	m.openModal(newPrompt("Run a shell command", "", "e.g. git log --oneline -5", "The TUI is suspended while it runs.", func(line string) tea.Cmd {
+	m.openModal(newPrompt("Run a shell command", "", "e.g. git log --oneline -5", "The TUI is suspended while it runs.", func(m *Model, line string) tea.Cmd {
 		if strings.TrimSpace(line) == "" {
 			return nil
 		}

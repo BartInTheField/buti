@@ -25,11 +25,11 @@ type composerModal struct {
 	subject   textinput.Model
 	body      textarea.Model
 	focusBody bool
-	onSubmit  func(msg string) tea.Cmd
-	onEditor  func() tea.Cmd // optional: write the message in $EDITOR instead
+	onSubmit  func(m *Model, msg string) tea.Cmd
+	onEditor  func(*Model) tea.Cmd // optional: write the message in $EDITOR instead
 }
 
-func newComposer(kind composeKind, context, initial string, onSubmit func(string) tea.Cmd) *composerModal {
+func newComposer(kind composeKind, context, initial string, onSubmit func(*Model, string) tea.Cmd) *composerModal {
 	subj, rest, _ := strings.Cut(strings.TrimSpace(initial), "\n")
 	s := textinput.New()
 	s.Prompt = ""
@@ -74,11 +74,11 @@ func (c *composerModal) update(m *Model, msg tea.Msg) tea.Cmd {
 			return nil
 		case "ctrl+s", "ctrl+enter":
 			m.closeModal()
-			return c.onSubmit(c.message())
+			return c.onSubmit(m, c.message())
 		case "ctrl+e":
 			if c.onEditor != nil {
 				m.closeModal()
-				return c.onEditor()
+				return c.onEditor(m)
 			}
 		case "tab":
 			return c.setFocusBody(!c.focusBody)
@@ -87,7 +87,7 @@ func (c *composerModal) update(m *Model, msg tea.Msg) tea.Cmd {
 		case "enter":
 			if !c.focusBody {
 				m.closeModal()
-				return c.onSubmit(c.message())
+				return c.onSubmit(m, c.message())
 			}
 		case "down":
 			if !c.focusBody {

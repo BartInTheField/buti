@@ -351,3 +351,34 @@ func TestShowVersion(t *testing.T) {
 		}
 	}
 }
+
+// Modal callbacks must act on the live model, not the copy that opened the modal.
+func TestModalCallbacksUpdateModel(t *testing.T) {
+	t.Run("palette enters a mode", func(t *testing.T) {
+		h := newHarness(t)
+		h.keys("ctrl+p")
+		h.typeText("commit…")
+		h.keys("enter")
+		if h.m.target == nil {
+			t.Fatal("Commit… from the palette should start picking a target")
+		}
+	})
+	t.Run("palette notifies", func(t *testing.T) {
+		h := newHarness(t)
+		h.keys("?")
+		h.typeText("open pull request")
+		h.keys("enter")
+		if !strings.Contains(h.screen(), "is not available for") {
+			t.Fatal("an unavailable action should say so")
+		}
+	})
+	t.Run("go to selects", func(t *testing.T) {
+		h := newHarness(t)
+		h.keys("/")
+		h.typeText("second")
+		h.keys("enter")
+		if got := h.selectedKey(); got != "commit:chg2" {
+			t.Fatalf("selected %q, want the second commit", got)
+		}
+	})
+}
