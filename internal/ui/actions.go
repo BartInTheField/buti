@@ -17,7 +17,8 @@ type action struct {
 	key    string
 	title  string
 	group  string
-	global bool // not about the selection; left out of the context menu
+	global bool   // not about the selection; left out of the context menu
+	hint   string // status bar label; set, the action is hinted before the others
 	when   func(m *Model, sel []entity) bool
 	run    func(m *Model, sel []entity) tea.Cmd
 }
@@ -121,6 +122,9 @@ func init() {
 					return c.PRNew(ctx, b, "", false)
 				})
 			}},
+		{key: "o", title: "Open pull request", group: "Branch", hint: "open PR",
+			when: func(m *Model, sel []entity) bool { return one(entBranch)(m, sel) && m.branchPR(sel[0]) != "" },
+			run:  (*Model).openPR},
 		{key: "a", title: "Apply branch…", group: "Branch", global: true, when: always, run: (*Model).applyPicker},
 		{key: "S", title: "Unapply stack", group: "Branch", when: one(entBranch, entCommit),
 			run: func(m *Model, sel []entity) tea.Cmd {
@@ -311,6 +315,47 @@ func (m *Model) enterTarget(v verb, sel []entity) tea.Cmd {
 		m.clampLanes()
 	}
 	return nil
+}
+
+// branchPR is the pull request label ("#3") of a branch entity, or "".
+func (m *Model) branchPR(e entity) string {
+	if m.status == nil {
+		return ""
+	}
+	for _, st := range m.status.Stacks {
+		for _, b := range st.Branches {
+			if b.Name == e.branch {
+				return b.PR()
+			}
+		}
+	}
+	return ""
+}
+
+func (m *Model) openPR(sel []entity) tea.Cmd {
+	client, branch, pr := m.client, sel[0].branch, m.branchPR(sel[0])
+	return func() tea.Msg {
+		url, err := client.ReviewURL(context.Background(), branch)
+		return prURLMsg{branch: branch, pr: pr, url: url, err: err}
+	}
+}
+
+type prURLMsg struct {
+	branch, pr, url string
+	err             error
+}
+
+func (m *Model) showPR(msg prURLMsg) tea.Cmd {
+	switch {
+	case msg.err != nil:
+		return m.notify(toastError, msg.err.Error())
+	case msg.url == "":
+		return m.notify(toastError, "No pull request found for "+msg.branch)
+	}
+	if err := openURL(msg.url); err != nil {
+		return m.notify(toastError, err.Error())
+	}
+	return m.notify(toastInfo, "Opened "+msg.pr+" in the browser")
 }
 
 func (m *Model) branchHasCommits(e entity) bool {

@@ -133,6 +133,9 @@ func editorCommand(path string) *exec.Cmd {
 	return exec.Command("sh", "-c", editor+` "$1"`, "editor", path)
 }
 
+// openURL opens a web page in the browser; tests replace it.
+var openURL = openExternal
+
 // openExternal opens a file with the desktop's default application, detached.
 func openExternal(path string) error {
 	opener := "xdg-open"

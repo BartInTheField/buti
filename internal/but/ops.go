@@ -228,3 +228,20 @@ func (c *Client) Branches(ctx context.Context) (*Branches, error) {
 	var b Branches
 	return &b, c.decode(ctx, &b, "branch", "list", "--json", "--all", "--empty", "--no-check")
 }
+
+// ReviewURL returns the web URL of a branch's pull request, or "" when it has none.
+// It asks the forge, so it is slower than Status.
+func (c *Client) ReviewURL(ctx context.Context, branch string) (string, error) {
+	var v struct {
+		Reviews []struct {
+			URL string `json:"url"`
+		} `json:"reviews"`
+	}
+	if err := c.decode(ctx, &v, "branch", "show", branch, "--review", "--json"); err != nil {
+		return "", err
+	}
+	if len(v.Reviews) == 0 {
+		return "", nil
+	}
+	return v.Reviews[0].URL, nil
+}
