@@ -68,3 +68,16 @@ func TestOpenPR(t *testing.T) {
 		t.Errorf("opened %q, want the PR page once", opened)
 	}
 }
+
+func TestFooterHintsOpenPR(t *testing.T) {
+	h := newHarness(t)
+	h.m.status.Stacks[0].Branches[1].ReviewID = "(#7)" // branch-1
+	h.selectText("branch-4")
+	if f := ansi.Strip(h.m.footer()); strings.Contains(f, "open PR") {
+		t.Errorf("branch without a PR hints it: %q", f)
+	}
+	h.selectText("branch-1")
+	if f := ansi.Strip(h.m.footer()); !strings.Contains(f, "o open PR") {
+		t.Errorf("footer %q: want the open PR hint", f)
+	}
+}

@@ -1021,11 +1021,25 @@ func (m *Model) footer() string {
 	default:
 		var hints []string
 		n := 0
-		for _, a := range m.available(m.subjects(), false) {
+		avail := m.available(m.subjects(), false)
+		slices.SortStableFunc(avail, func(a, b action) int {
+			switch {
+			case a.hint != "" && b.hint == "":
+				return -1
+			case a.hint == "" && b.hint != "":
+				return 1
+			}
+			return 0
+		})
+		for _, a := range avail {
 			if a.key == "" || a.key == "." || len(a.key) > 5 || n >= 7 {
 				continue
 			}
-			hints = append(hints, a.key, shortTitle(a.title))
+			label := a.hint
+			if label == "" {
+				label = shortTitle(a.title)
+			}
+			hints = append(hints, a.key, label)
 			n++
 		}
 		msg = keyHints(append(hints, "?", "help")...)

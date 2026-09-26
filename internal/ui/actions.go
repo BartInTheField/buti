@@ -17,7 +17,8 @@ type action struct {
 	key    string
 	title  string
 	group  string
-	global bool // not about the selection; left out of the context menu
+	global bool   // not about the selection; left out of the context menu
+	hint   string // status bar label; set, the action is hinted before the others
 	when   func(m *Model, sel []entity) bool
 	run    func(m *Model, sel []entity) tea.Cmd
 }
@@ -121,7 +122,7 @@ func init() {
 					return c.PRNew(ctx, b, "", false)
 				})
 			}},
-		{key: "o", title: "Open pull request", group: "Branch",
+		{key: "o", title: "Open pull request", group: "Branch", hint: "open PR",
 			when: func(m *Model, sel []entity) bool { return one(entBranch)(m, sel) && m.branchPR(sel[0]) != "" },
 			run:  (*Model).openPR},
 		{key: "a", title: "Apply branch…", group: "Branch", global: true, when: always, run: (*Model).applyPicker},
