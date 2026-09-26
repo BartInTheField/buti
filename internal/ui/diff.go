@@ -47,12 +47,31 @@ type diffOpts struct {
 	marked   map[string]bool // hunk ids drawn as marked
 }
 
+// diffRow is one line of a laid out diff, before hunk selection and marks are drawn.
+type diffRow struct {
+	hunk   int    // index into the hunks, -1 for lines outside a hunk
+	header bool   // the hunk's @@ line; text is unstyled and already truncated
+	text   string // the rendered line, without the two column hunk gutter
+}
+
+// diffLayout is a diff highlighted and rendered at one width. Selection and
+// marks are applied on top by doc, so moving between hunks stays cheap.
+type diffLayout struct {
+	rows  []diffRow
+	hunks []hunkRef
+}
+
 // renderDiff draws a syntax highlighted unified diff at the given width.
 func renderDiff(d *but.Diff, width int, o diffOpts) diffDoc {
-	var doc diffDoc
+	return layoutDiff(d, width).doc(o)
+}
+
+// layoutDiff does the expensive part of rendering: parsing and highlighting.
+func layoutDiff(d *but.Diff, width int) diffLayout {
+	var l diffLayout
 	if len(d.Changes) == 0 {
-		doc.lines = []string{mutedStyle.Render("No changes")}
-		return doc
+		l.rows = []diffRow{{hunk: -1, text: mutedStyle.Render("No changes")}}
+		return l
 	}
 	numW := 1
 	for _, f := range d.Changes {
@@ -60,21 +79,22 @@ func renderDiff(d *but.Diff, width int, o diffOpts) diffDoc {
 			numW = max(numW, len(strconv.Itoa(h.OldStart+h.OldLines)), len(strconv.Itoa(h.NewStart+h.NewLines)))
 		}
 	}
+	plain := func(text string) { l.rows = append(l.rows, diffRow{hunk: -1, text: text}) }
 	prevPath := ""
 	for _, f := range d.Changes {
 		// Uncommitted diffs list one entry per hunk; group them under one file header.
 		if f.Path != prevPath {
 			if prevPath != "" {
-				doc.lines = append(doc.lines, "")
+				plain("")
 			}
 			letter, st := changeTypeStyle(f.Status)
 			header := " " + st.Inherit(fileHeaderStyle).Render(letter) + fileHeaderStyle.Render(" "+f.Path)
-			doc.lines = append(doc.lines, fileHeaderStyle.Width(width).Render(ansi.Truncate(header, width, "…")))
+			plain(fileHeaderStyle.Width(width).Render(ansi.Truncate(header, width, "…")))
 		}
 		prevPath = f.Path
 
 		if f.Diff.Type != "patch" {
-			doc.lines = append(doc.lines, mutedStyle.Render(fmt.Sprintf("  (%s, no text diff)", f.Diff.Type)))
+			plain(mutedStyle.Render(fmt.Sprintf("  (%s, no text diff)", f.Diff.Type)))
 			continue
 		}
 		for _, h := range f.Diff.Hunks {
@@ -82,34 +102,61 @@ func renderDiff(d *but.Diff, width int, o diffOpts) diffDoc {
 			if len(f.Diff.Hunks) > 1 {
 				id = "" // ids address single-hunk entries only
 			}
-			ref := hunkRef{line: len(doc.lines), id: id, path: f.Path, text: h.Diff}
-			idx := len(doc.hunks)
-			sel := idx == o.selected
+			ref := hunkRef{line: len(l.rows), id: id, path: f.Path, text: h.Diff}
+			idx := len(l.hunks)
 			header, lines := parseHunk(f.Path, h)
-			bar := "  "
-			switch {
-			case id != "" && o.marked[id]:
-				bar = markGlyph + " "
-			case sel:
-				bar = lipgloss.NewStyle().Foreground(colorAccent).Render("▶ ")
+			l.rows = append(l.rows, diffRow{hunk: idx, header: true, text: ansi.Truncate(header, max(width-2, 1), "…")})
+			for _, dl := range lines {
+				l.rows = append(l.rows, diffRow{hunk: idx, text: renderDiffLine(dl, numW, width-2)})
 			}
-			hh := hunkHeaderStyle
-			if sel {
-				hh = hh.Bold(true).Reverse(true)
-			}
-			doc.lines = append(doc.lines, bar+hh.Render(ansi.Truncate(header, max(width-2, 1), "…")))
-			for _, l := range lines {
-				gutter := "  "
-				if sel {
-					gutter = lipgloss.NewStyle().Foreground(colorAccent).Render("▌ ")
-				}
-				doc.lines = append(doc.lines, gutter+renderDiffLine(l, numW, width-2))
-			}
-			ref.end = len(doc.lines)
-			doc.hunks = append(doc.hunks, ref)
+			ref.end = len(l.rows)
+			l.hunks = append(l.hunks, ref)
 		}
 	}
+	return l
+}
+
+// doc draws the hunk gutters for the given selection and marks.
+func (l diffLayout) doc(o diffOpts) diffDoc {
+	doc := diffDoc{lines: make([]string, len(l.rows)), hunks: l.hunks}
+	for i, r := range l.rows {
+		if r.hunk < 0 {
+			doc.lines[i] = r.text
+		}
+	}
+	for i := range l.hunks {
+		l.drawHunk(doc.lines, i, o)
+	}
 	return doc
+}
+
+var (
+	selBarGlyph    = lipgloss.NewStyle().Foreground(colorAccent).Render("▶ ")
+	selGutterGlyph = lipgloss.NewStyle().Foreground(colorAccent).Render("▌ ")
+	selHunkHeader  = hunkHeaderStyle.Bold(true).Reverse(true)
+)
+
+// drawHunk writes hunk i's lines into dst, which is indexed like the rows.
+func (l diffLayout) drawHunk(dst []string, i int, o diffOpts) {
+	ref := l.hunks[i]
+	sel := i == o.selected
+	bar, hh, gutter := "  ", hunkHeaderStyle, "  "
+	switch {
+	case ref.id != "" && o.marked[ref.id]:
+		bar = markGlyph + " "
+	case sel:
+		bar = selBarGlyph
+	}
+	if sel {
+		hh, gutter = selHunkHeader, selGutterGlyph
+	}
+	for j := ref.line; j < ref.end; j++ {
+		if r := l.rows[j]; r.header {
+			dst[j] = bar + hh.Render(r.text)
+		} else {
+			dst[j] = gutter + r.text
+		}
+	}
 }
 
 func (d diffDoc) String() string { return strings.Join(d.lines, "\n") }

@@ -20,7 +20,7 @@
 | `space` | mark (on **Unstaged**, marks every file) |
 | `f` / `F` | files in the commit / in every commit |
 | `d` / `D` / `+` `-` | details pane / full screen / resize |
-| `tab` | cycle focus: sidebar → lanes → details. In details: `j`/`k` hunks, `space` marks a hunk, then `c` / `r` / `x` on hunks |
+| `tab` | cycle focus: sidebar → lanes → details. In details: `j`/`k` hunks (scrolling through one taller than the pane first), `J`/`K` scroll, `space` marks a hunk, then `c` / `r` / `x` on hunks |
 | `y` / `Y` | copy (branch name, change id, path, hunk) / pick what to copy |
 | `o` / `O` | open a file in `$EDITOR` / with the default app; `o` on a branch with a pull request opens it in the browser |
 | `/` / `t` | go to anything (fuzzy) / go to a branch |

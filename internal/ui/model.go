@@ -128,6 +128,7 @@ func (m *Model) closeModal()        { m.modal = nil }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmd := m.update(msg)
+	m.layoutDetails()
 	// Keep the details pane on whatever is selected now.
 	return m, tea.Batch(cmd, m.syncDetails(false))
 }
@@ -154,8 +155,7 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 		return nil
 
 	case detailsMsg:
-		m.det.receive(msg)
-		m.det.rerender(m.hunkMarks())
+		m.det.receive(msg, m.hunkMarks())
 		return nil
 
 	case opDoneMsg:
@@ -731,17 +731,9 @@ func (m *Model) handleDetailsKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	marks := m.hunkMarks()
 	switch msg.String() {
 	case "j", "down":
-		if len(d.doc.hunks) > 0 {
-			d.selectHunk(d.hunk+1, marks)
-		} else {
-			d.vp.ScrollDown(1)
-		}
+		d.step(1, marks)
 	case "k", "up":
-		if len(d.doc.hunks) > 0 {
-			d.selectHunk(d.hunk-1, marks)
-		} else {
-			d.vp.ScrollUp(1)
-		}
+		d.step(-1, marks)
 	case "J":
 		d.vp.ScrollDown(1)
 	case "K":
@@ -802,6 +794,19 @@ func (m *Model) split() (lanesH, detH int) {
 	}
 	detH = clamp(h*m.det.pct/100, 4, h-4)
 	return h - detH - 1, detH
+}
+
+// layoutDetails sizes the details pane to where render will draw it.
+func (m *Model) layoutDetails() {
+	if m.width == 0 {
+		return
+	}
+	switch _, detH := m.split(); {
+	case m.det.full:
+		m.det.setSize(m.width-1, m.bodyHeight()-1)
+	case detH > 0:
+		m.det.setSize(m.rightWidth()-1, detH-1)
+	}
 }
 
 // laneLayout returns the lane width and how many lanes fit on screen.

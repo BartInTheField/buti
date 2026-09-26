@@ -24,9 +24,16 @@ type segment struct {
 	style lipgloss.Style
 }
 
+// lexerCache holds the lexer matched for each path, nil when none matched.
+var lexerCache = map[string]chroma.Lexer{}
+
 // highlight tokenizes text with the lexer for path and returns the segments of each line.
 func highlight(path, text string) [][]segment {
-	lexer := lexers.Match(path)
+	lexer, ok := lexerCache[path]
+	if !ok {
+		lexer = lexers.Match(path)
+		lexerCache[path] = lexer
+	}
 	if lexer == nil {
 		lexer = lexers.Analyse(text)
 	}
