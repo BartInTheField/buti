@@ -262,3 +262,19 @@ func TestRenderFitsScreen(t *testing.T) {
 	h.keys("esc", "D")
 	check("full details")
 }
+
+func TestUpdateOffered(t *testing.T) {
+	h := newHarness(t)
+	h.m.opts.Version = "2026.09.26.1"
+	h.send(updateAvailableMsg{latest: "2026.09.26.2"})
+	if _, ok := h.m.modal.(*confirmModal); !ok {
+		t.Fatalf("expected an update prompt, got %T", h.m.modal)
+	}
+	if !strings.Contains(h.screen(), "2026.09.26.2 is available") {
+		t.Fatal("prompt should name the new version")
+	}
+	h.keys("esc")
+	if h.m.modal != nil {
+		t.Fatal("esc should dismiss the prompt")
+	}
+}
