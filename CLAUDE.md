@@ -69,6 +69,18 @@ building one inline, and update the table in `docs/testing.md`.
 
 ## Version control
 
-The repository itself is managed with GitButler. Use `but` for commits, branches and PRs (`but commit -b <branch>`,
-`but pr new <branch>`), not git write commands. Other branches may be applied in the workspace at the same time, so
+The repository itself is managed with GitButler. Use `but` for commits, branches and pushes (`but commit -b <branch>`,
+`but push <branch>`), not git write commands. Other branches may be applied in the workspace at the same time, so
 commit only the files that belong to your change.
+
+Open PRs with `gh pr create` so you can attach screenshots of UI changes. Push first, then pass `--base` (`main`, or
+the branch below yours when it's stacked) and one `--attach` per screenshot from `mise run screenshots`:
+
+```sh
+but push <branch>
+gh pr create --head <branch> --base main --title "..." --body-file pr.md \
+  --attach 'screenshots/Workspace-help.png#The help with the new command'
+```
+
+A body that references an attached file, such as `![Help](screenshots/Workspace-help.png)`, gets the uploaded image
+in its place; otherwise the attachments are appended.
