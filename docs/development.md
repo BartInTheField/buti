@@ -12,7 +12,7 @@ mise run lint
 mise run test               # unit tests (a fake `but`)
 mise run test:integration   # plus the tests against the real `but` CLI
 mise run screenshots        # end-to-end tests, saving every screen to screenshots/
-mise run readme-screenshot  # refresh docs/images/screenshot.png
+mise run readme-screenshot  # refresh the screenshots in docs/images
 mise run fixture            # create the test repository to try buti by hand
 ```
 

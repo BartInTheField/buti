@@ -78,7 +78,8 @@ mise run screenshots   # -> screenshots/*.png (git-ignored)
 ```
 
 This is the way to check a UI change by eye, including for agents that can read images. The README image is the
-`Workspace-hero` snap; `mise run readme-screenshot` refreshes it.
+`Workspace-hero` snap, and [Resolving conflicts](conflicts.md) uses the `ResolveInEditMode` ones; `mise run
+readme-screenshot` refreshes them all.
 
 ## CI
 

@@ -26,9 +26,13 @@ env = { BUTI_INTEGRATION = "1" }
 run = "rm -rf screenshots && BUTI_SCREENSHOTS=$PWD/screenshots go test -count=1 -run E2E ./internal/ui"
 
 [tasks.readme-screenshot]
-description = "Refresh docs/images/screenshot.png from the end-to-end tests"
+description = "Refresh the screenshots in docs/images from the end-to-end tests"
 depends = ["screenshots"]
-run = "mkdir -p docs/images && cp screenshots/Workspace-hero.png docs/images/screenshot.png"
+run = """
+mkdir -p docs/images/conflicts
+cp screenshots/Workspace-hero.png docs/images/screenshot.png
+for s in conflicted edit-mode resolved; do cp screenshots/ResolveInEditMode-$s.png docs/images/conflicts/$s.png; done
+"""
 
 [tasks.fixture]
 description = "Create the test repository in a temp dir, to run buti against by hand"

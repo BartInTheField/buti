@@ -39,6 +39,7 @@ palette.
 ## Docs
 
 - [Usage](docs/usage.md): flags, the select → verb → target flow, drag and drop, the mouse
+- [Resolving conflicts](docs/conflicts.md): fixing a conflicted commit in edit mode
 - [Keys](docs/keys.md): every key binding
 - [Development](docs/development.md): building, the code layout, releases
 - [Testing](docs/testing.md): unit tests, the test repository, end-to-end tests and screenshots, CI
