@@ -7,8 +7,14 @@ with syntax-highlighted diffs ([Chroma](https://github.com/alecthomas/chroma)). 
 
 ## Install
 
-Download a binary for your platform from the [latest release](https://github.com/BartInTheField/buti/releases/latest),
-or build from source:
+On Linux or macOS:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/BartInTheField/buti/main/install.sh | sh
+```
+
+You can also download a binary from the [latest release](https://github.com/BartInTheField/buti/releases/latest), or
+build from source:
 
 ```sh
 go install github.com/bartinthefield/buti/cmd/buti@latest
