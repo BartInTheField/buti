@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/bartinthefield/buti/internal/testrepo"
 )
 
 // TestIntegration runs every operation against the real `but` CLI in a scratch
@@ -18,12 +20,15 @@ func TestIntegration(t *testing.T) {
 	if _, err := exec.LookPath("but"); err != nil {
 		t.Skip("but not on PATH")
 	}
-	dir := t.TempDir()
+	dir, home := t.TempDir(), t.TempDir()
+	for _, kv := range testrepo.Env(home) {
+		k, v, _ := strings.Cut(kv, "=")
+		t.Setenv(k, v) // for git below and for the client
+	}
 	sh := func(args ...string) {
 		t.Helper()
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("%v: %v\n%s", args, err, out)
 		}

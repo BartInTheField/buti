@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/cursor"
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -83,15 +85,16 @@ func (f *fakeBut) expect(want ...string) {
 
 // harness drives a Model through Update, running returned commands like the runtime.
 type harness struct {
-	t   *testing.T
-	m   Model
-	but *fakeBut
+	t    *testing.T
+	m    Model
+	but  *fakeBut      // nil against a real repository
+	wait time.Duration // how long a command may take before it counts as a timer
 }
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	c, f := newFakeBut(t, testStatus())
-	h := &harness{t: t, m: New(c, Options{}), but: f}
+	h := &harness{t: t, m: New(c, Options{}), but: f, wait: 150 * time.Millisecond}
 	h.send(tea.WindowSizeMsg{Width: 140, Height: 36})
 	h.run(h.m.fetchStatus())
 	return h
@@ -105,7 +108,8 @@ func (h *harness) send(msg tea.Msg) {
 }
 
 // run executes cmd and feeds its messages back. Commands that block (ticks,
-// spinners, toast timers) are dropped after a short wait.
+// toast timers) are dropped after h.wait; animation frames (spinner, cursor blink)
+// are dropped so they don't loop.
 func (h *harness) run(cmd tea.Cmd) {
 	queue := []tea.Cmd{cmd}
 	for steps := 0; len(queue) > 0 && steps < 200; steps++ {
@@ -119,14 +123,14 @@ func (h *harness) run(cmd tea.Cmd) {
 		var msg tea.Msg
 		select {
 		case msg = <-done:
-		case <-time.After(150 * time.Millisecond):
+		case <-time.After(h.wait):
 			continue
 		}
 		switch msg := msg.(type) {
 		case nil:
 		case tea.BatchMsg:
 			queue = append(queue, msg...)
-		case tickMsg, toastExpireMsg:
+		case tickMsg, toastExpireMsg, spinner.TickMsg, cursor.BlinkMsg:
 		default:
 			nm, next := h.m.Update(msg)
 			h.m = nm.(Model)

@@ -1,6 +1,7 @@
 [tools]
 go = "1.27.1"
 "go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "latest"
+"go:github.com/charmbracelet/freeze" = "0.2.2"
 
 [tasks.run]
 description = "Run buti in the current repo"
@@ -11,7 +12,27 @@ description = "Build the buti binary"
 run = "go build -o bin/buti ./cmd/buti"
 
 [tasks.test]
+description = "Unit tests (a fake `but`)"
 run = "go test ./..."
+
+[tasks."test:integration"]
+description = "Unit tests plus the client and UI tests against the real `but` CLI"
+env = { BUTI_INTEGRATION = "1" }
+run = "go test -count=1 ./..."
+
+[tasks.screenshots]
+description = "Run the UI end-to-end tests and save screenshots to screenshots/"
+env = { BUTI_INTEGRATION = "1" }
+run = "rm -rf screenshots && BUTI_SCREENSHOTS=$PWD/screenshots go test -count=1 -run E2E ./internal/ui"
+
+[tasks.readme-screenshot]
+description = "Refresh docs/images/screenshot.png from the end-to-end tests"
+depends = ["screenshots"]
+run = "mkdir -p docs/images && cp screenshots/Workspace-hero.png docs/images/screenshot.png"
+
+[tasks.fixture]
+description = "Create the test repository in a temp dir, to run buti against by hand"
+run = "go run ./internal/testrepo/mkrepo \"$(mktemp -d)\""
 
 [tasks.lint]
 run = "golangci-lint run"
