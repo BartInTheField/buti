@@ -1,0 +1,71 @@
+name: Bug report
+description: Something in buti doesn't work, looks wrong, or crashes
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! If the problem also happens with the plain `but` CLI (for example `but commit` fails the
+        same way), it's probably a GitButler issue: please report it to
+        [gitbutlerapp/gitbutler](https://github.com/gitbutlerapp/gitbutler/issues) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, and what went wrong? Include any error message buti showed.
+      placeholder: I dragged a commit onto the Unstaged header and buti showed "…".
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: |
+        The keys or clicks, and what the workspace looked like (stacks, branches, uncommitted files). `but status`
+        output helps a lot; remove anything private.
+      placeholder: |
+        1. Two stacks, the first with a stacked branch
+        2. Select the top commit of the stacked branch
+        3. Press `m`, pick the other stack, press `enter`
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: A screenshot of the terminal, if the problem is visible. Paste or drag an image here.
+  - type: input
+    id: buti-version
+    attributes:
+      label: buti version
+      description: Output of `buti --version`.
+      placeholder: buti 2026.09.26.1
+    validations:
+      required: true
+  - type: input
+    id: but-version
+    attributes:
+      label: GitButler CLI version
+      description: Output of `but --version`.
+      placeholder: but 0.22.3
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: macOS 15.4, Ubuntu 24.04, ...
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal
+      description: Terminal emulator, and tmux/zellij/screen if you use one.
+      placeholder: Ghostty 1.2 inside tmux 3.5

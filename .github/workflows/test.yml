@@ -1,0 +1,55 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Named jobs are the required status checks on main; renaming one needs the branch protection updated too.
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      # Pinned so a new but release can't break PRs; bump both together.
+      BUT_URL: https://releases.gitbutler.com/releases/release/0.22.3-3234/linux/x86_64/but
+      BUT_SHA256: 3f4f543a6ccd931ce6c86c484058dbe5e29439597d001f6a0a9c28d9e533ea18
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Install but
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL -o "$HOME/.local/bin/but" "$BUT_URL"
+          echo "$BUT_SHA256  $HOME/.local/bin/but" | sha256sum -c -
+          chmod +x "$HOME/.local/bin/but"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: but --version
+      - name: Install freeze (renders screenshots to PNG)
+        run: go install github.com/charmbracelet/freeze@v0.2.2
+      - name: Integration tests
+        env:
+          BUTI_INTEGRATION: "1"
+          BUTI_SCREENSHOTS: ${{ runner.temp }}/screenshots
+        run: go test -count=1 ./...
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: ignore
