@@ -21,9 +21,18 @@ type fileRow struct {
 	ids       []string // for directories: CLI ids of every file below
 }
 
+// Change types of the rows for conflicted files, which have no CLI id.
+const (
+	changeConflicted = "conflicted"
+	changeResolved   = "resolved"
+)
+
 func (r fileRow) entity() entity {
 	if r.isDir {
 		return entity{kind: entDir, ids: r.ids, label: r.path + "/"}
+	}
+	if t := r.change.ChangeType; t == changeConflicted || t == changeResolved {
+		return entity{kind: entConflict, label: r.path, status: t}
 	}
 	return entity{kind: entFile, id: r.change.CliID, label: r.path}
 }
@@ -92,6 +101,20 @@ func buildFileRows(changes []but.Change, collapsed map[string]bool) []fileRow {
 		}
 	}
 	walk(root, "", 0)
+	return rows
+}
+
+// conflictRows lists the files of a commit in edit mode, conflicted first.
+func conflictRows(conflicted, resolved []string) []fileRow {
+	var rows []fileRow
+	for _, g := range []struct {
+		paths []string
+		typ   string
+	}{{conflicted, changeConflicted}, {resolved, changeResolved}} {
+		for _, p := range slices.Sorted(slices.Values(g.paths)) {
+			rows = append(rows, fileRow{name: p, path: p, change: but.Change{FilePath: p, ChangeType: g.typ}})
+		}
+	}
 	return rows
 }
 

@@ -34,6 +34,7 @@ const (
 	hitMore        // a branch card's ⋯ menu
 	hitDetails
 	hitDetailsClose
+	hitButton // an edit mode button; key is its action's
 )
 
 type hit struct {
@@ -43,11 +44,21 @@ type hit struct {
 	files      bool
 	row        int // file row, -1 for the header
 	lane, item int
+	key        string
 }
 
 // hitTest maps screen coordinates to what is drawn there.
 func (m *Model) hitTest(x, y int) hit {
 	if m.status == nil || y >= m.bodyHeight() {
+		return hit{}
+	}
+	if m.resolving() {
+		switch row, key := m.editView().hit(x, y); {
+		case row >= 0:
+			return hit{kind: hitEntity, ent: m.files[row].entity(), files: true, row: row}
+		case key != "":
+			return hit{kind: hitButton, key: key}
+		}
 		return hit{}
 	}
 	if m.det.full {
@@ -186,6 +197,11 @@ func (m *Model) handleClick(msg tea.MouseClickMsg) tea.Cmd {
 			}
 		}
 		return nil
+	case hitButton:
+		if a, ok := m.actionFor(h.key, m.subjects()); ok {
+			return a.run(m, m.subjects())
+		}
+		return nil
 	case hitStartCommit:
 		return m.startCommitInLane(h.lane)
 	case hitPush:
@@ -204,6 +220,8 @@ func (m *Model) handleClick(msg tea.MouseClickMsg) tea.Cmd {
 			m.toggleDir()
 		case h.ent.kind == entNewBranch:
 			return m.promptNewBranch(placementNone, "as a new lane")
+		case double && h.ent.kind == entConflict:
+			return m.execInteractive("Edit "+h.ent.label, keepSelection, editorCommand(m.pathOf(h.ent)))
 		case double:
 			return m.setDetailsFull(true)
 		}

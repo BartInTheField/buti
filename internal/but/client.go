@@ -82,6 +82,8 @@ type Status struct {
 	Stacks             []Stack       `json:"stacks"`
 	MergeBase          Commit        `json:"mergeBase"`
 	UpstreamState      UpstreamState `json:"upstreamState"`
+
+	Resolving *Resolution `json:"-"` // set in edit mode, when the rest is empty
 }
 
 // Client runs `but` commands in a repository directory.
@@ -141,8 +143,15 @@ func (c *Client) decode(ctx context.Context, v any, args ...string) error {
 
 // Status returns the workspace state, including files changed per commit.
 func (c *Client) Status(ctx context.Context) (*Status, error) {
-	var s Status
-	return &s, c.decode(ctx, &s, "status", "--json", "-f")
+	out, err := c.run(ctx, "status", "--json", "-f")
+	if err != nil {
+		return nil, err
+	}
+	s, err := decodeStatus(out)
+	if err != nil {
+		return nil, fmt.Errorf("decode but status: %w", err)
+	}
+	return s, nil
 }
 
 type Hunk struct {

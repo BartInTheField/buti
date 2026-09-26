@@ -42,7 +42,8 @@ When you change the UI:
 1. Add or update a unit test for the behavior.
 2. Add an `h.snap` at the screen you changed (in an existing e2e test, or a new `TestE2E...`), run
    `mise run screenshots`, and look at the result. Check alignment, truncation, colors and that nothing overflows.
-3. If the README screenshot is affected (`Workspace-hero`), refresh it with `mise run readme-screenshot`.
+3. If a screenshot in `docs/images` is affected (`Workspace-hero`, `ResolveInEditMode-*`), refresh them with
+   `mise run readme-screenshot`.
 
 If the fixture lacks a state you need (a conflict, a long branch, many stacks), extend `internal/testrepo` rather than
 building one inline, and update the table in `docs/testing.md`.

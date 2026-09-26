@@ -49,6 +49,11 @@ The drop does the natural thing:
 | branch | branch | stack it onto the branch |
 | branch | new-branch lane | unstack it |
 
+## Conflicts
+
+A conflicted commit (`✗`) is resolved in edit mode: select it and press `e`, then fix its files in your editor. See
+[Resolving conflicts](conflicts.md).
+
 ## Mouse
 
 - Click to select; double-click for the full diff; right-click for actions.

@@ -77,6 +77,9 @@ func (d *details) sync(c *but.Client, e entity, force bool) tea.Cmd {
 		return nil
 	}
 	key := e.key()
+	if conflicted(e) {
+		key += ":conflicted" // resolving keeps the change id, but not the diff
+	}
 	if key == d.reqKey && !force {
 		return nil
 	}
@@ -279,6 +282,9 @@ func commitHeader(e entity) []string {
 	}
 	for _, l := range strings.Split(msg, "\n") {
 		lines = append(lines, "  "+l)
+	}
+	if conflicted(e) {
+		return append(lines, "", errorStyle.Render("✗ Conflicted")+mutedStyle.Render(" · e resolves it in edit mode"), "")
 	}
 	return append(lines, "", mutedStyle.Render(pluralize(len(c.Changes), "file")+" changed"), "")
 }

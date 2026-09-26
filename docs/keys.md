@@ -12,6 +12,7 @@
 | `n` | insert an empty commit |
 | `A` | absorb changes into the commits they belong to |
 | `x` | discard, after confirming (undo with `u`) |
+| `e` | resolve a conflicted commit (`✗`) in edit mode; in edit mode: save and exit (`x` cancels, `o` opens the conflicted files, `enter` the selected one) |
 | `b` / `B` | new branch: stacked on the selected branch, or a new lane / below the selected branch |
 | `P` / `N` | push the branch / open a pull request |
 | `a` / `S` | apply a branch (picker) / unapply the stack |
