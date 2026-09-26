@@ -175,6 +175,9 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 	case branchesMsg:
 		return m.showApplyPicker(msg)
 
+	case prURLMsg:
+		return m.showPR(msg)
+
 	case oplogMsg:
 		return m.showOplog(msg)
 

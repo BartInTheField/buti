@@ -90,7 +90,7 @@ what applies to the selection.
 | `d` / `D` / `+` `-` | details pane / full screen / resize |
 | `tab` | cycle focus: sidebar → lanes → details. In details: `j`/`k` hunks, `space` marks a hunk, then `c` / `r` / `x` on hunks |
 | `y` / `Y` | copy (branch name, change id, path, hunk) / pick what to copy |
-| `o` / `O` | open in `$EDITOR` / with the default app |
+| `o` / `O` | open a file in `$EDITOR` / with the default app; `o` on a branch with a pull request opens it in the browser |
 | `/` / `t` | go to anything (fuzzy) / go to a branch |
 | `:` / `!` | run a `but` command (the output is shown) / a shell command |
 | `j` `k` `h` `l` · `J` `K` · `g` `G` | move · next/previous branch · top/bottom |
