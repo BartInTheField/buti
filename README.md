@@ -5,6 +5,18 @@ A terminal UI for [GitButler](https://gitbutler.com), built with
 like the desktop app: an **Unstaged** file tree on the left, one lane per stack with branch cards, and a details pane
 with syntax-highlighted diffs ([Chroma](https://github.com/alecthomas/chroma)). Everything runs through the `but` CLI.
 
+## Install
+
+Download a binary for your platform from the [latest release](https://github.com/BartInTheField/buti/releases/latest),
+or build from source:
+
+```sh
+go install github.com/bartinthefield/buti/cmd/buti@latest
+```
+
+Every merge to `main` is released automatically, versioned with [CalVer](https://calver.org) as
+`YYYY.MM.DD.N`, where `N` counts the releases of that day (`2026.09.26.1`, `2026.09.26.2`, ...).
+
 ## Setup
 
 ```sh
@@ -16,7 +28,7 @@ BUTI_INTEGRATION=1 go test ./internal/but   # every operation against the real `
 ```
 
 ```
-buti [-C dir] [--diff] [--remember-selection] [target]
+buti [-C dir] [--diff] [--remember-selection] [--version] [target]
 ```
 
 The `but` CLI has to be on `PATH`, and the repo has to be set up with GitButler (`but setup`). `target` is a CLI id or
