@@ -194,13 +194,27 @@ func TestPushAndUndo(t *testing.T) {
 	h := newHarness(t)
 	h.selectText("branch-4")
 	h.keys("P", "u")
-	h.but.expect("push branch-4", "undo")
+	h.but.expect("push branch-4", "status --json -f --refresh-prs", "undo")
+}
+
+func TestCreatePRSyncsPRs(t *testing.T) {
+	h := newHarness(t)
+	h.selectText("branch-4")
+	h.keys("N")
+	h.but.expect("pr new branch-4 --default", "status --json -f --refresh-prs")
+}
+
+// Reload syncs pull requests from the forge; the 3-second poll doesn't, as that would be slow.
+func TestReloadSyncsPRs(t *testing.T) {
+	h := newHarness(t)
+	h.keys("ctrl+r")
+	h.but.expect("status --json -f --refresh-prs")
 }
 
 func TestPushButton(t *testing.T) {
 	h := newHarness(t)
 	h.click("Push ⇡")
-	h.but.expect("push branch-4")
+	h.but.expect("push branch-4", "status --json -f --refresh-prs")
 }
 
 func TestStartCommitButton(t *testing.T) {
@@ -238,7 +252,7 @@ func TestPaletteRunsAction(t *testing.T) {
 	h.keys("ctrl+p")
 	h.typeText("push")
 	h.keys("enter")
-	h.but.expect("push branch-4")
+	h.but.expect("push branch-4", "status --json -f --refresh-prs")
 }
 
 func TestRenderFitsScreen(t *testing.T) {

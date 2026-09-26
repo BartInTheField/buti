@@ -142,8 +142,18 @@ func (c *Client) decode(ctx context.Context, v any, args ...string) error {
 }
 
 // Status returns the workspace state, including files changed per commit.
+// Pull requests come from GitButler's cache, which only a forge sync updates.
 func (c *Client) Status(ctx context.Context) (*Status, error) {
-	out, err := c.run(ctx, "status", "--json", "-f")
+	return c.status(ctx, "status", "--json", "-f")
+}
+
+// SyncedStatus is Status after syncing pull requests from the forge, so it is slower.
+func (c *Client) SyncedStatus(ctx context.Context) (*Status, error) {
+	return c.status(ctx, "status", "--json", "-f", "--refresh-prs")
+}
+
+func (c *Client) status(ctx context.Context, args ...string) (*Status, error) {
+	out, err := c.run(ctx, args...)
 	if err != nil {
 		return nil, err
 	}

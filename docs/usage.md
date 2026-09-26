@@ -21,6 +21,10 @@ The `but` CLI has to be on `PATH`, and the repository has to be set up with GitB
 - **Details** (bottom, `d`): the diff of whatever is selected, syntax highlighted. `D` makes it full screen.
 - **Status bar**: the mode, the keys that apply now, and how far the workspace is behind upstream.
 
+buti reloads every 3 seconds. A branch's pull request and its checks come from GitButler's cache, which the reload
+doesn't sync with the forge, because that is slow. buti syncs it after you push or create a pull request, and when you
+press `ctrl+r`. Press `ctrl+r` to pick up a pull request opened elsewhere (with `gh`, say) or checks that finished.
+
 ## Select, verb, target
 
 Most operations follow the same steps:
