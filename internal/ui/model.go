@@ -36,7 +36,8 @@ type Options struct {
 	Target      string // CLI id or branch name to select on start
 	ShowDetails bool   // open the details pane on start
 	StateFile   string // when set, the selection is saved here on quit and restored on start
-	Version     string // running release; when set, a newer release is offered on start
+	Version     string // running version; only a release (see update.IsRelease) can update itself
+	UpdateCheck bool   // offer a newer release on start
 	UpdateCache string // where the latest release version is cached between runs
 }
 
@@ -185,8 +186,8 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 	case updateAvailableMsg:
 		return m.offerUpdate(msg.latest)
 
-	case updateStartedMsg:
-		return m.notify(toastInfo, "Updating to "+msg.version+"…")
+	case updateNoticeMsg:
+		return m.notify(msg.kind, msg.text)
 
 	case updateDoneMsg:
 		return m.handleUpdateDone(msg)

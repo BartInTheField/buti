@@ -48,7 +48,7 @@ func keyHints(pairs ...string) string {
 type confirmModal struct {
 	title, body string
 	yesLabel    string
-	onYes       func() tea.Cmd
+	onYes       func(*Model) tea.Cmd
 }
 
 func (c *confirmModal) update(m *Model, msg tea.Msg) tea.Cmd {
@@ -56,7 +56,7 @@ func (c *confirmModal) update(m *Model, msg tea.Msg) tea.Cmd {
 		switch k.String() {
 		case "y", "enter":
 			m.closeModal()
-			return c.onYes()
+			return c.onYes(m)
 		case "n", "esc", "q":
 			m.closeModal()
 		}
@@ -80,10 +80,10 @@ type promptModal struct {
 	title    string
 	hint     string
 	input    textinput.Model
-	onSubmit func(string) tea.Cmd
+	onSubmit func(*Model, string) tea.Cmd
 }
 
-func newPrompt(title, value, placeholder, hint string, onSubmit func(string) tea.Cmd) *promptModal {
+func newPrompt(title, value, placeholder, hint string, onSubmit func(*Model, string) tea.Cmd) *promptModal {
 	in := textinput.New()
 	in.Prompt = "› "
 	in.Placeholder = placeholder
@@ -98,7 +98,7 @@ func (p *promptModal) update(m *Model, msg tea.Msg) tea.Cmd {
 		switch k.String() {
 		case "enter":
 			m.closeModal()
-			return p.onSubmit(p.input.Value())
+			return p.onSubmit(m, p.input.Value())
 		case "esc":
 			m.closeModal()
 			return nil
@@ -135,13 +135,13 @@ type pickerModal struct {
 	matches  []int // indexes into items, in display order
 	cursor   int
 	offset   int
-	onPick   func(pickItem) tea.Cmd
+	onPick   func(*Model, pickItem) tea.Cmd
 	empty    string
 	maxRows  int
 	lastRows int
 }
 
-func newPicker(title string, items []pickItem, onPick func(pickItem) tea.Cmd) *pickerModal {
+func newPicker(title string, items []pickItem, onPick func(*Model, pickItem) tea.Cmd) *pickerModal {
 	f := textinput.New()
 	f.Prompt = "/ "
 	f.Placeholder = "type to filter"
@@ -181,7 +181,7 @@ func (p *pickerModal) update(m *Model, msg tea.Msg) tea.Cmd {
 		case "enter":
 			if p.cursor < len(p.matches) {
 				m.closeModal()
-				return p.onPick(p.items[p.matches[p.cursor]])
+				return p.onPick(m, p.items[p.matches[p.cursor]])
 			}
 			return nil
 		case "up", "ctrl+p", "ctrl+k":

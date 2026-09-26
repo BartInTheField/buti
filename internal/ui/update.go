@@ -13,8 +13,11 @@ import (
 
 type (
 	updateAvailableMsg struct{ latest string }
-	updateStartedMsg   struct{ version string }
-	updateDoneMsg      struct {
+	updateNoticeMsg    struct {
+		kind toastKind
+		text string
+	}
+	updateDoneMsg struct {
 		version string
 		err     error
 	}
@@ -22,7 +25,7 @@ type (
 
 // checkUpdate looks for a newer release in the background; failures (offline, rate limits) are silent.
 func (m Model) checkUpdate() tea.Cmd {
-	if m.opts.Version == "" {
+	if !m.opts.UpdateCheck || !update.IsRelease(m.opts.Version) {
 		return nil
 	}
 	current, cache := m.opts.Version, m.opts.UpdateCache
@@ -37,6 +40,39 @@ func (m Model) checkUpdate() tea.Cmd {
 	}
 }
 
+// checkUpdateNow asks GitHub for the latest release, skipping the cache, and reports the outcome either way.
+func (m *Model) checkUpdateNow([]entity) tea.Cmd {
+	current := m.opts.Version
+	if !update.IsRelease(current) {
+		return m.notify(toastInfo, "Development builds can't update themselves")
+	}
+	notice := func(kind toastKind, text string) tea.Msg { return updateNoticeMsg{kind, text} }
+	return tea.Batch(m.notify(toastInfo, "Checking for updates…"), func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		latest, err := update.Latest(ctx, "")
+		switch {
+		case err != nil:
+			return notice(toastError, "Couldn't check for updates: "+firstLines(err.Error(), 3))
+		case update.Newer(latest, current):
+			return updateAvailableMsg{latest: latest}
+		}
+		return notice(toastSuccess, "buti "+current+" is the latest version")
+	})
+}
+
+// showVersion reports the running version.
+func (m *Model) showVersion([]entity) tea.Cmd {
+	text := "buti " + m.opts.Version
+	if !update.IsRelease(m.opts.Version) {
+		text = "buti development build"
+		if m.opts.Version != "" {
+			text += " (" + m.opts.Version + ")"
+		}
+	}
+	return m.notify(toastInfo, text)
+}
+
 func (m *Model) offerUpdate(latest string) tea.Cmd {
 	text := "buti " + latest + " is available (you have " + m.opts.Version + ")."
 	if m.modal != nil {
@@ -47,9 +83,8 @@ func (m *Model) offerUpdate(latest string) tea.Cmd {
 		title:    "Update available",
 		body:     text + " Update now?",
 		yesLabel: "update",
-		// onYes runs after this Update returns, so it reports back through messages rather than m.
-		onYes: func() tea.Cmd {
-			return tea.Batch(func() tea.Msg { return updateStartedMsg{latest} }, installUpdate(latest))
+		onYes: func(m *Model) tea.Cmd {
+			return tea.Batch(m.notify(toastInfo, "Updating to "+latest+"…"), installUpdate(latest))
 		},
 	})
 	return nil

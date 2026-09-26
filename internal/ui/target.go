@@ -329,7 +329,7 @@ func (t *targetMode) squashPlan(p plan, ids []string, target entity, targetID st
 	}
 	combined := strings.Join(msgs, "\n\n")
 	p.run = func(m *Model) tea.Cmd {
-		return m.openComposer(composeSquash, p.desc, combined, func(msg string) tea.Cmd {
+		return m.openComposer(composeSquash, p.desc, combined, func(m *Model, msg string) tea.Cmd {
 			return m.runOp(p.desc, selectNew, func(ctx context.Context, c *but.Client) error {
 				return c.Squash(ctx, ids, targetID, but.SquashCombineMessages, msg)
 			})

@@ -131,8 +131,19 @@ func TestE2EWorkspace(t *testing.T) {
 
 	h.keys("?")
 	h.snap("help")
+	h.typeText("u")
+	h.snap("help-search")
 	h.keys("esc", "ctrl+p")
 	h.snap("palette")
+	// A command picked from the palette acts on the live model: it opens a picker that selects.
+	h.typeText("go to branch")
+	h.keys("enter")
+	h.typeText("fix-typo")
+	h.keys("enter")
+	if got := h.selectedKey(); got != "branch:fix-typo" {
+		h.t.Fatalf("selected %q, want branch:fix-typo", got)
+	}
+	h.snap("palette-goto-branch")
 }
 
 func TestE2ECommitFileToBranch(t *testing.T) {

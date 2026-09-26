@@ -100,16 +100,16 @@ func (m *Model) knownKeys() map[string]bool {
 
 // startCommit asks for a message (unless empty) and commits ids at the placement.
 func (m *Model) startCommit(ids []string, at but.Placement, empty bool, desc string) tea.Cmd {
-	commit := func(msg string) tea.Cmd {
+	commit := func(m *Model, msg string) tea.Cmd {
 		return m.runOp(desc, selectNew, func(ctx context.Context, c *but.Client) error {
 			return c.Commit(ctx, ids, msg, at)
 		})
 	}
 	if empty {
-		return commit("")
+		return commit(m, "")
 	}
 	cm := newComposer(composeCommit, desc, "", commit)
-	cm.onEditor = func() tea.Cmd {
+	cm.onEditor = func(m *Model) tea.Cmd {
 		args := append(append([]string{"commit"}, ids...), at.Args()...)
 		return m.execInteractive(desc, selectNew, m.client.Command(args...))
 	}
@@ -117,7 +117,7 @@ func (m *Model) startCommit(ids []string, at but.Placement, empty bool, desc str
 	return nil
 }
 
-func (m *Model) openComposer(kind composeKind, desc, initial string, onSubmit func(string) tea.Cmd) tea.Cmd {
+func (m *Model) openComposer(kind composeKind, desc, initial string, onSubmit func(*Model, string) tea.Cmd) tea.Cmd {
 	m.openModal(newComposer(kind, desc, initial, onSubmit))
 	return nil
 }

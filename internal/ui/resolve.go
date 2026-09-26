@@ -39,7 +39,7 @@ func (m *Model) openConflicted([]entity) tea.Cmd {
 }
 
 func (m *Model) saveAndExit([]entity) tea.Cmd {
-	save := func() tea.Cmd {
+	save := func(m *Model) tea.Cmd {
 		return m.runOp("Save and exit edit mode", keepSelection, func(ctx context.Context, c *but.Client) error {
 			return c.ResolveFinish(ctx)
 		})
@@ -54,13 +54,13 @@ func (m *Model) saveAndExit([]entity) tea.Cmd {
 			onYes: save})
 		return nil
 	}
-	return save()
+	return save(m)
 }
 
 func (m *Model) cancelEdit([]entity) tea.Cmd {
 	m.openModal(&confirmModal{title: "Leave edit mode without saving?", yesLabel: "leave",
 		body: "The commit stays conflicted, and edits to its files are dropped.",
-		onYes: func() tea.Cmd {
+		onYes: func(m *Model) tea.Cmd {
 			return m.runOp("Cancel edit mode", keepSelection, func(ctx context.Context, c *but.Client) error {
 				return c.ResolveCancel(ctx, true)
 			})

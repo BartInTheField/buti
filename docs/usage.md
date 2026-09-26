@@ -63,8 +63,9 @@ A conflicted commit (`✗`) is resolved in edit mode: select it and press `e`, t
 ## Updates
 
 Releases are versioned with [CalVer](https://calver.org) as `YYYY.MM.DD.N`. buti checks for a newer release on start
-(at most once a day) and offers to update itself in place. Set `BUTI_NO_UPDATE_CHECK=1` to turn that off. Builds without
-a release version (`go run`, `go install`) never check.
+(at most once a day) and offers to update itself in place. Set `BUTI_NO_UPDATE_CHECK=1` to turn that off. **Update buti**
+in the help (`?`) or the command palette checks right away, and **Version** shows the version you're running. Builds
+without a release version (`go run`, `go install`) never check.
 
 ## Not (yet) ported from `but tui`
 

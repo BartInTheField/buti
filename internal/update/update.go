@@ -86,6 +86,12 @@ func Newer(a, b string) bool {
 	return false
 }
 
+// IsRelease reports whether v is a release version, as opposed to a development build.
+func IsRelease(v string) bool {
+	_, ok := parse(v)
+	return ok
+}
+
 func parse(v string) ([4]int, bool) {
 	var out [4]int
 	parts := strings.Split(v, ".")
