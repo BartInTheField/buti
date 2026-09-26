@@ -139,7 +139,7 @@ func init() {
 			run: func(m *Model, sel []entity) tea.Cmd {
 				b := sel[0].branch
 				return m.runOp("Create pull request for "+b, keepSelection, func(ctx context.Context, c *but.Client) error {
-					return c.PRNew(ctx, b, "", false)
+					return syncPRs(ctx, c, c.PRNew(ctx, b, "", false))
 				})
 			}},
 		{key: "o", title: "Open pull request", group: "Branch", hint: "open PR",
@@ -215,7 +215,7 @@ func init() {
 		{key: ":", title: "Run a but command…", group: "View", global: true, resolving: true, when: always, run: (*Model).butPrompt},
 		{key: "!", title: "Run a shell command…", group: "View", global: true, resolving: true, when: always, run: (*Model).shellPrompt},
 		{key: "ctrl+r", title: "Reload", group: "View", global: true, resolving: true, when: always,
-			run: func(m *Model, _ []entity) tea.Cmd { return tea.Batch(m.fetchStatus(), m.syncDetails(true)) }},
+			run: func(m *Model, _ []entity) tea.Cmd { return tea.Batch(m.fetchSyncedStatus(), m.syncDetails(true)) }},
 		{title: "Version", group: "View", global: true, resolving: true, when: always, run: (*Model).showVersion},
 		{title: "Update buti", group: "View", global: true, resolving: true, when: always, run: (*Model).checkUpdateNow},
 		{key: ".", title: "Actions for selection…", group: "View", global: true, resolving: true, when: always, run: (*Model).contextMenu},
@@ -514,7 +514,9 @@ func (m *Model) push(sel []entity) tea.Cmd {
 		return m.notify(toastInfo, b+" has nothing to push")
 	}
 	run := func(m *Model, force bool) tea.Cmd {
-		return m.runOp("Push "+b, keepSelection, func(ctx context.Context, c *but.Client) error { return c.Push(ctx, b, force) })
+		return m.runOp("Push "+b, keepSelection, func(ctx context.Context, c *but.Client) error {
+			return syncPRs(ctx, c, c.Push(ctx, b, force))
+		})
 	}
 	if status == "unpushedCommitsRequiringForce" {
 		m.openModal(&confirmModal{title: "Force push " + b + "?", yesLabel: "force push",
@@ -522,6 +524,15 @@ func (m *Model) push(sel []entity) tea.Cmd {
 		return nil
 	}
 	return run(m, false)
+}
+
+// syncPRs syncs pull requests from the forge after an operation that can change them, so
+// the reload shows them. A failed sync is not worth reporting: the operation itself worked.
+func syncPRs(ctx context.Context, c *but.Client, err error) error {
+	if err == nil {
+		_, _ = c.SyncedStatus(ctx)
+	}
+	return err
 }
 
 func (m *Model) applyPicker([]entity) tea.Cmd {

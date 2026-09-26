@@ -58,7 +58,8 @@ func newFakeButJSON(t *testing.T, status string) (*but.Client, *fakeBut) {
 	f := &fakeBut{t: t, log: filepath.Join(dir, "log")}
 	script := "#!/bin/sh\n" +
 		"case \"$1\" in\n" +
-		"  status) cat '" + statusFile + "' ;;\n" +
+		"  status) case \"$*\" in *--refresh-prs*) echo \"$*\" >> '" + f.log + "' ;; esac\n" +
+		"    cat '" + statusFile + "' ;;\n" +
 		"  diff) echo '{\"changes\":[]}' ;;\n" +
 		"  *) echo \"$*\" >> '" + f.log + "' ;;\n" +
 		"esac\n"
@@ -71,7 +72,7 @@ func newFakeButJSON(t *testing.T, status string) (*but.Client, *fakeBut) {
 	return c, f
 }
 
-// calls returns the mutating commands run so far.
+// calls returns the mutating commands and pull request syncs run so far.
 func (f *fakeBut) calls() []string {
 	b, _ := os.ReadFile(f.log)
 	s := strings.TrimSpace(string(b))

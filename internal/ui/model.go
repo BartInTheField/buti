@@ -121,6 +121,14 @@ func (m Model) fetchStatus() tea.Cmd {
 	}
 }
 
+// fetchSyncedStatus is fetchStatus with pull requests synced from the forge.
+func (m Model) fetchSyncedStatus() tea.Cmd {
+	return func() tea.Msg {
+		s, err := m.client.SyncedStatus(context.Background())
+		return statusMsg{status: s, err: err}
+	}
+}
+
 func tick() tea.Cmd {
 	return tea.Tick(refreshInterval, func(time.Time) tea.Msg { return tickMsg{} })
 }

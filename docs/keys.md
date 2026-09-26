@@ -29,4 +29,4 @@
 | `ctrl+p` | command palette (also holds commands without a key: **Version**, **Update buti**) |
 | `j` `k` `h` `l` · `J` `K` · `g` `G` | move · next/previous branch · top/bottom |
 | `esc` | back: leave the mode, clear marks, close details |
-| `ctrl+r` · `q` | reload (it also polls every 3 seconds) · quit |
+| `ctrl+r` · `q` | reload and sync pull requests from the forge (it also polls every 3 seconds, without the sync) · quit |
