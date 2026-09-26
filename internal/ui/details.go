@@ -16,6 +16,7 @@ import (
 const (
 	detailsMinPct = 30
 	detailsMaxPct = 90
+	detailsTail   = 3 // blank lines after the diff, so the end reads as the end
 )
 
 // details is the diff/commit pane, split under the lanes or full screen.
@@ -31,8 +32,15 @@ type details struct {
 	err     error
 	data    *but.Diff
 	header  []string
+	layout  diffLayout // data rendered at layoutW, reused while only the selection changes
+	layoutD *but.Diff
+	layoutW int
+	marks   map[string]bool // hunk marks last drawn
 	doc     diffDoc
-	hunk    int // selected hunk, when focused
+	drawn   int      // hunk drawn as selected in lines
+	lines   []string // the viewport's content; doc.lines follow the header when patchable
+	patch   bool     // whether lines hold the current layout, so hunks can be redrawn in place
+	hunk    int      // selected hunk, when focused
 	vp      viewport.Model
 	width   int
 }
@@ -100,7 +108,7 @@ func (d *details) sync(c *but.Client, e entity, force bool) tea.Cmd {
 	}
 }
 
-func (d *details) receive(msg detailsMsg) {
+func (d *details) receive(msg detailsMsg, marks map[string]bool) {
 	if msg.key != d.reqKey {
 		return
 	}
@@ -108,7 +116,7 @@ func (d *details) receive(msg detailsMsg) {
 	if d.hunk >= 0 && d.data != nil && d.hunk >= countHunks(d.data) {
 		d.hunk = countHunks(d.data) - 1
 	}
-	d.rerender()
+	d.rerender(marks)
 }
 
 func countHunks(diff *but.Diff) int {
@@ -119,13 +127,15 @@ func countHunks(diff *but.Diff) int {
 	return n
 }
 
-// rerender rebuilds the content at the current width, selection and marks.
+// rerender rebuilds the content at the current width, selection and marks,
+// keeping the marks last drawn when none are given. Highlighting is only redone
+// when the diff or the width changed.
 func (d *details) rerender(marked ...map[string]bool) {
-	var marks map[string]bool
 	if len(marked) > 0 {
-		marks = marked[0]
+		d.marks = marked[0]
 	}
 	lines := append([]string(nil), d.header...)
+	d.patch = false
 	switch {
 	case d.err != nil:
 		lines = append(lines, errorStyle.Render(d.err.Error()))
@@ -140,10 +150,39 @@ func (d *details) rerender(marked ...map[string]bool) {
 		if d.focused {
 			sel = d.hunk
 		}
-		d.doc = renderDiff(d.data, max(d.width, 20), diffOpts{selected: sel, marked: marks})
+		if w := max(d.width, 20); d.layoutD != d.data || d.layoutW != w {
+			d.layout, d.layoutD, d.layoutW = layoutDiff(d.data, w), d.data, w
+		}
+		d.doc = d.layout.doc(diffOpts{selected: sel, marked: d.marks})
 		lines = append(lines, d.doc.lines...)
+		lines = append(lines, make([]string, detailsTail)...)
+		d.drawn, d.patch = sel, true
 	}
-	d.vp.SetContent(strings.Join(lines, "\n"))
+	d.lines = lines
+	d.vp.SetContentLines(lines)
+}
+
+// redraw updates the selection and marks by redrawing only the hunks that
+// changed. It writes into the viewport's content in place: SetContentLines
+// measures every line, which is slow for large diffs, and hunk gutters never
+// change a line's width.
+func (d *details) redraw(marks map[string]bool) {
+	sel := -1
+	if d.focused {
+		sel = d.hunk
+	}
+	if !d.patch || len(d.lines) != len(d.header)+len(d.layout.rows)+detailsTail {
+		d.rerender(marks)
+		return
+	}
+	o := diffOpts{selected: sel, marked: marks}
+	dst := d.lines[len(d.header):]
+	for i, h := range d.layout.hunks {
+		if i == sel || i == d.drawn || (h.id != "" && marks[h.id] != d.marks[h.id]) {
+			d.layout.drawHunk(dst, i, o)
+		}
+	}
+	d.drawn, d.marks = sel, marks
 }
 
 func (d *details) setSize(w, h int) {
@@ -161,7 +200,7 @@ func (d *details) selectHunk(i int, marks map[string]bool) {
 		return
 	}
 	d.hunk = clamp(i, 0, len(d.doc.hunks)-1)
-	d.rerender(marks)
+	d.redraw(marks)
 	h := d.doc.hunks[d.hunk]
 	top, bottom := len(d.header)+h.line, len(d.header)+h.end
 	switch {
@@ -169,6 +208,35 @@ func (d *details) selectHunk(i int, marks map[string]bool) {
 		d.vp.SetYOffset(top)
 	case bottom > d.vp.YOffset()+d.vp.Height():
 		d.vp.SetYOffset(min(top, bottom-d.vp.Height()))
+	}
+}
+
+// step moves the hunk selection by dir. While the selected hunk continues past
+// the edge of the pane, it scrolls instead, so a hunk taller than the pane can be
+// read to the end; past the first and last hunk it scrolls to the content beyond.
+func (d *details) step(dir int, marks map[string]bool) {
+	switch {
+	case len(d.doc.hunks) > 0 && d.hunk < 0:
+		d.selectHunk(0, marks)
+		return
+	case len(d.doc.hunks) == 0 && dir > 0:
+		d.vp.ScrollDown(1)
+		return
+	case len(d.doc.hunks) == 0:
+		d.vp.ScrollUp(1)
+		return
+	}
+	h := d.doc.hunks[d.hunk]
+	top, bottom := len(d.header)+h.line, len(d.header)+h.end
+	y := d.vp.YOffset()
+	visible := bottom > y && top < y+d.vp.Height()
+	switch {
+	case dir > 0 && visible && bottom > y+d.vp.Height(), dir > 0 && d.hunk == len(d.doc.hunks)-1:
+		d.vp.ScrollDown(1)
+	case dir < 0 && visible && top < y, dir < 0 && d.hunk == 0:
+		d.vp.ScrollUp(1)
+	default:
+		d.selectHunk(d.hunk+dir, marks)
 	}
 }
 
@@ -215,7 +283,9 @@ func commitHeader(e entity) []string {
 	return append(lines, "", mutedStyle.Render(pluralize(len(c.Changes), "file")+" changed"), "")
 }
 
-// view renders the pane with a title bar.
+// view renders the pane with a title bar. The pane must already be sized by
+// setSize: View works on a copy of the model, so sizing here would be lost and
+// the diff re-rendered on every frame.
 func (d *details) view(width, height int) string {
 	title := "Details"
 	if d.ent.valid() {
@@ -232,6 +302,5 @@ func (d *details) view(width, height int) string {
 	if d.full {
 		bar += strings.Repeat(" ", max(width-ansi.StringWidth(bar)-9, 1)) + buttonStyle.Render("esc ✕")
 	}
-	d.setSize(width-1, height-1)
 	return lipgloss.JoinVertical(lipgloss.Left, bar, lipgloss.NewStyle().PaddingLeft(1).Render(d.vp.View()))
 }
