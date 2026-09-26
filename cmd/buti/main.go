@@ -45,6 +45,11 @@ func main() {
 	}
 
 	opts := ui.Options{Target: flag.Arg(0), ShowDetails: *diff}
+	// Builds without a release version (go run, go install) have nothing to update to.
+	if version != "dev" && os.Getenv("BUTI_NO_UPDATE_CHECK") == "" {
+		opts.Version = version
+		opts.UpdateCache = updateCache()
+	}
 	if *remember {
 		opts.StateFile = stateFile(abs)
 	}
@@ -53,6 +58,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, "buti:", err)
 		os.Exit(1)
 	}
+}
+
+// updateCache is where the latest release version is remembered between runs.
+func updateCache() string {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, "buti", "latest-version")
 }
 
 // stateFile is where the selection of the repository at dir is remembered.

@@ -36,6 +36,8 @@ type Options struct {
 	Target      string // CLI id or branch name to select on start
 	ShowDetails bool   // open the details pane on start
 	StateFile   string // when set, the selection is saved here on quit and restored on start
+	Version     string // running release; when set, a newer release is offered on start
+	UpdateCache string // where the latest release version is cached between runs
 }
 
 type (
@@ -107,7 +109,7 @@ func New(client *but.Client, opts Options) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.fetchStatus(), tick())
+	return tea.Batch(m.fetchStatus(), tick(), m.checkUpdate())
 }
 
 func (m Model) fetchStatus() tea.Cmd {
@@ -175,6 +177,15 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 
 	case oplogMsg:
 		return m.showOplog(msg)
+
+	case updateAvailableMsg:
+		return m.offerUpdate(msg.latest)
+
+	case updateStartedMsg:
+		return m.notify(toastInfo, "Updating to "+msg.version+"…")
+
+	case updateDoneMsg:
+		return m.handleUpdateDone(msg)
 
 	case toastExpireMsg:
 		m.expireToast(msg.id)
