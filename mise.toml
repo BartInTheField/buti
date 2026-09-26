@@ -1,0 +1,17 @@
+[tools]
+go = "1.27.1"
+"go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "latest"
+
+[tasks.run]
+description = "Run buti in the current repo"
+run = "go run ./cmd/buti"
+
+[tasks.build]
+description = "Build the buti binary"
+run = "go build -o bin/buti ./cmd/buti"
+
+[tasks.test]
+run = "go test ./..."
+
+[tasks.lint]
+run = "golangci-lint run"
