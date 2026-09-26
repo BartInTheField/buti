@@ -16,10 +16,11 @@ const (
 	entCommit                   // commit on an applied branch
 	entCommittedFile            // file inside a commit
 	entNewBranch                // the "new branch" drop lane, only a target
+	entConflict                 // file of the commit in edit mode, with or without conflict markers
 )
 
 func (k entityKind) String() string {
-	return [...]string{"nothing", "all changes", "directory", "file", "hunk", "branch", "commit", "committed file", "new branch"}[k]
+	return [...]string{"nothing", "all changes", "directory", "file", "hunk", "branch", "commit", "committed file", "new branch", "conflicted file"}[k]
 }
 
 // uncommitted reports whether the entity is (a set of) uncommitted changes.
@@ -37,7 +38,7 @@ type entity struct {
 	branch string      // owning (or own) branch name, for branches, commits and committed files
 	stack  string      // owning stack CLI id
 	commit *but.Commit // for commits, and the parent commit of committed files
-	status string      // branch status, for branches
+	status string      // branch status, for branches; "conflicted" or "resolved" for conflicted files
 }
 
 // cliIDs returns the ids to pass to `but` for this entity.

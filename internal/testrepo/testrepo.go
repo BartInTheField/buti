@@ -12,6 +12,8 @@
 //	uncommitted    README.md and src/server.go modified, src/util/strings.go added,
 //	               docs/old.md deleted
 //
+// Conflict pulls origin/main on top of that, into a conflicted commit.
+//
 // Commits carry fixed dates, but but gives each commit a random change id, so
 // commit and CLI ids differ between runs: find things by name, not by id.
 package testrepo
@@ -196,6 +198,17 @@ func (b *builder) build() {
 		b.err = os.Remove(filepath.Join(r.Dir, "docs/old.md"))
 	}
 	b.write("src/server.go", strings.Replace(serverGo, ":8080", ":9090", 1))
+}
+
+// Conflict adds a branch changelog whose commit adds its own CHANGELOG.md,
+// then pulls, which rebases that commit onto the upstream one into a conflict.
+func (r *Repo) Conflict() error {
+	b := &builder{r: r}
+	b.run("but", "branch", "new", "changelog")
+	b.write("CHANGELOG.md", "# Changelog\n\n- Token auth\n")
+	b.commit("changelog", "Start a changelog", "CHANGELOG.md")
+	b.run("but", "pull")
+	return b.err
 }
 
 const serverGo = `package demo

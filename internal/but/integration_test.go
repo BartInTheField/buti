@@ -178,3 +178,82 @@ func TestIntegration(t *testing.T) {
 	}
 	must("restore", c.OplogRestore(ctx, entries[len(entries)-1].ID))
 }
+
+// TestIntegrationResolve edits a conflicted commit in edit mode, in the testrepo
+// fixture pulled into a conflict.
+func TestIntegrationResolve(t *testing.T) {
+	if os.Getenv("BUTI_INTEGRATION") == "" {
+		t.Skip("set BUTI_INTEGRATION=1 to run against the real but CLI")
+	}
+	if _, err := exec.LookPath("but"); err != nil {
+		t.Skip("but not on PATH")
+	}
+	r, err := testrepo.Create(t.TempDir())
+	if err == nil {
+		err = r.Conflict()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Setenv(t.Setenv)
+	ctx := context.Background()
+	c := New(r.Dir)
+	must := func(what string, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+	}
+	status := func() *Status {
+		t.Helper()
+		s, err := c.Status(ctx)
+		must("status", err)
+		return s
+	}
+	changelog := func() Commit {
+		t.Helper()
+		for _, st := range status().Stacks {
+			for _, b := range st.Branches {
+				if b.Name == "changelog" {
+					return b.Commits[0]
+				}
+			}
+		}
+		t.Fatal("no changelog branch")
+		return Commit{}
+	}
+	isConflicted := func(c Commit) bool { return c.Conflicted != nil && *c.Conflicted }
+	fix := func() {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(r.Dir, "CHANGELOG.md"), []byte("# Changelog\n\n- Both\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	commit := changelog()
+	if !isConflicted(commit) {
+		t.Fatal("the changelog commit should be conflicted")
+	}
+
+	// Edit mode: status reports the commit's files instead of the workspace.
+	must("resolve", c.ResolveStart(ctx, commit.CliID))
+	s := status()
+	if s.Resolving == nil || len(s.Resolving.Conflicted) != 1 || s.Resolving.Conflicted[0] != "CHANGELOG.md" || len(s.Stacks) != 0 {
+		t.Fatalf("edit mode: %+v", s)
+	}
+	fix()
+	if s = status(); s.Resolving == nil || !s.Resolving.AllResolved {
+		t.Fatalf("after editing: %+v", s.Resolving)
+	}
+	must("resolve cancel", c.ResolveCancel(ctx, true))
+	if s = status(); s.Resolving != nil || !isConflicted(changelog()) {
+		t.Fatal("cancel should leave the commit conflicted")
+	}
+
+	must("resolve again", c.ResolveStart(ctx, changelog().CliID))
+	fix()
+	must("resolve finish", c.ResolveFinish(ctx))
+	if isConflicted(changelog()) {
+		t.Fatal("finishing left the commit conflicted")
+	}
+}

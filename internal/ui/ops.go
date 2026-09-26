@@ -122,7 +122,7 @@ func (m *Model) openComposer(kind composeKind, desc, initial string, onSubmit fu
 	return nil
 }
 
-func editorCommand(path string) *exec.Cmd {
+func editorCommand(paths ...string) *exec.Cmd {
 	editor := os.Getenv("VISUAL")
 	if editor == "" {
 		editor = os.Getenv("EDITOR")
@@ -130,7 +130,7 @@ func editorCommand(path string) *exec.Cmd {
 	if editor == "" {
 		editor = "vi"
 	}
-	return exec.Command("sh", "-c", editor+` "$1"`, "editor", path)
+	return exec.Command("sh", append([]string{"-c", editor + ` "$@"`, "editor"}, paths...)...)
 }
 
 // openURL opens a web page in the browser; tests replace it.

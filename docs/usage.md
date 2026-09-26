@@ -49,6 +49,18 @@ The drop does the natural thing:
 | branch | branch | stack it onto the branch |
 | branch | new-branch lane | unstack it |
 
+## Conflicts
+
+A pull or a rebase can leave a commit **conflicted**, marked `✗` in its lane. Select it and press `e` to resolve it in
+**edit mode** (`but resolve <commit>`), like the desktop app: the commit is checked out with conflict markers in its
+files, and buti shows the commit and its files instead of the workspace.
+
+Fix the files in your editor: `o` opens every conflicted file in `$EDITOR`, `enter` (or a double-click) the selected
+one, or use any editor you like. A file turns **Resolved** once its markers are gone; the view refreshes by itself.
+Then **save and exit** with `e`, which commits the resolution and rebases what's above it (buti asks first if markers
+are left, since they would be committed as they are), or **cancel** with `x`, which leaves the commit conflicted and
+drops your edits. Your uncommitted changes are set aside while you're in edit mode.
+
 ## Mouse
 
 - Click to select; double-click for the full diff; right-click for actions.

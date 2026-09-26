@@ -70,10 +70,11 @@ type Model struct {
 	showFiles    map[string]bool
 	showAllFiles bool
 
-	marks  map[string]entity // by entity key
-	target *targetMode
-	modal  modal
-	det    details
+	marks   map[string]entity // by entity key
+	target  *targetMode
+	editing *but.Commit // the commit buti put in edit mode; `but` doesn't say which it is
+	modal   modal
+	det     details
 
 	busy          string
 	spinner       spinner.Model
@@ -284,6 +285,15 @@ func (m *Model) rebuild() {
 		return
 	}
 	prev := m.selected().key()
+	if r := m.status.Resolving; r != nil {
+		m.files, m.lanes, m.focus = conflictRows(r.Conflicted, r.Resolved), nil, focusFiles
+		m.det.focused, m.det.full = false, false
+		m.selectKey(prev)
+		return
+	}
+	if m.busy == "" {
+		m.editing = nil // edit mode is over, or entering it failed
+	}
 	m.files = buildFileRows(m.status.UncommittedChanges, m.collapsed)
 	m.lanes = append(buildLanes(m.status, func(c *but.Commit) bool {
 		return m.showAllFiles || m.showFiles[commitKey(c)]
@@ -531,6 +541,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		case entArea, entFile, entCommittedFile:
 			return m.setDetailsFull(true)
+		case entConflict:
+			return m.execInteractive("Edit "+e.label, keepSelection, editorCommand(m.pathOf(e)))
 		case entNewBranch:
 			return m.promptNewBranch(but.Placement{}, "as a new lane")
 		}
@@ -608,6 +620,9 @@ func (m *Model) handleNavKey(key string) bool {
 		m.det.pct = clamp(m.det.pct-5, detailsMinPct, detailsMaxPct)
 	default:
 		return false
+	}
+	if m.resolving() {
+		m.focus = focusFiles // there are no lanes
 	}
 	m.clampFiles()
 	m.clampLanes()
@@ -818,7 +833,11 @@ func (m *Model) laneLayout() (width, visible int) {
 }
 
 func (m *Model) clampFiles() {
-	m.fileCursor = clamp(m.fileCursor, -1, len(m.files)-1)
+	lo := -1
+	if m.resolving() && len(m.files) > 0 {
+		lo = 0 // the header stands for all changes, which are set aside
+	}
+	m.fileCursor = clamp(m.fileCursor, lo, len(m.files)-1)
 	h := m.bodyHeight() - 2 // sidebar header + rule
 	if m.fileCursor >= 0 {
 		if m.fileCursor < m.fileOffset {
@@ -904,7 +923,9 @@ func (m Model) View() tea.View {
 func (m *Model) render() string {
 	h := m.bodyHeight()
 	var body string
-	if m.det.full {
+	if m.resolving() {
+		body = m.editView().render(m.width, h)
+	} else if m.det.full {
 		body = m.det.view(m.width, h)
 	} else {
 		body = m.workspaceView()
@@ -986,6 +1007,9 @@ func (m *Model) sidebarView(width, height int) string {
 
 func (m *Model) footer() string {
 	chip := lipgloss.NewStyle().Background(colorSurface).Foreground(colorText).Padding(0, 1).Render("normal")
+	if m.resolving() {
+		chip = lipgloss.NewStyle().Background(colorDel).Foreground(lipgloss.Color("#1C1917")).Bold(true).Padding(0, 1).Render("edit mode")
+	}
 	var msg string
 	switch {
 	case m.drag != nil && m.drag.moved:

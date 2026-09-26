@@ -19,8 +19,16 @@ type action struct {
 	group  string
 	global bool   // not about the selection; left out of the context menu
 	hint   string // status bar label; set, the action is hinted before the others
-	when   func(m *Model, sel []entity) bool
-	run    func(m *Model, sel []entity) tea.Cmd
+	// resolving: also offered in edit mode, which hides the others (the
+	// workspace is set aside, so they would act on nothing or get in the way).
+	resolving bool
+	when      func(m *Model, sel []entity) bool
+	run       func(m *Model, sel []entity) tea.Cmd
+}
+
+// offers reports whether a is available for sel in the current mode.
+func (m *Model) offers(a action, sel []entity) bool {
+	return (a.resolving || !m.resolving()) && a.when(m, sel)
 }
 
 func always(*Model, []entity) bool { return true }
@@ -103,6 +111,18 @@ func init() {
 				return len(sel) > 0 && !allOf(sel, entNewBranch) && (sel[0].kind != entArea || hasUncommitted(m))
 			},
 			run: (*Model).discard},
+
+		// Conflicts: e enters edit mode on a conflicted commit, and saves and exits it.
+		{key: "e", title: "Resolve in edit mode", group: "Conflicts", hint: "resolve",
+			when: func(m *Model, sel []entity) bool { return one(entCommit)(m, sel) && conflicted(sel[0]) },
+			run:  (*Model).resolve},
+		{key: "e", title: "Save and exit", group: "Conflicts", hint: "save and exit", resolving: true,
+			when: func(m *Model, _ []entity) bool { return m.resolving() }, run: (*Model).saveAndExit},
+		{key: "o", title: "Open conflicted files", group: "Conflicts", hint: "open conflicted", resolving: true,
+			when: func(m *Model, _ []entity) bool { return m.resolving() && len(m.status.Resolving.Conflicted) > 0 },
+			run:  (*Model).openConflicted},
+		{key: "x", title: "Cancel editing…", group: "Conflicts", hint: "cancel", resolving: true,
+			when: func(m *Model, _ []entity) bool { return m.resolving() }, run: (*Model).cancelEdit},
 
 		// Branches and history.
 		{key: "m", title: "Move…", group: "Branch", when: verbAvailable(verbMove),
@@ -192,13 +212,13 @@ func init() {
 		{key: "Y", title: "Copy…", group: "View", when: one(entBranch, entCommit, entFile, entCommittedFile, entHunk), run: (*Model).copyPicker},
 		{key: "/", title: "Go to…", group: "View", global: true, when: always, run: (*Model).gotoPicker},
 		{key: "t", title: "Go to branch…", group: "View", global: true, when: always, run: (*Model).branchPicker},
-		{key: ":", title: "Run a but command…", group: "View", global: true, when: always, run: (*Model).butPrompt},
-		{key: "!", title: "Run a shell command…", group: "View", global: true, when: always, run: (*Model).shellPrompt},
-		{key: "ctrl+r", title: "Reload", group: "View", global: true, when: always,
+		{key: ":", title: "Run a but command…", group: "View", global: true, resolving: true, when: always, run: (*Model).butPrompt},
+		{key: "!", title: "Run a shell command…", group: "View", global: true, resolving: true, when: always, run: (*Model).shellPrompt},
+		{key: "ctrl+r", title: "Reload", group: "View", global: true, resolving: true, when: always,
 			run: func(m *Model, _ []entity) tea.Cmd { return tea.Batch(m.fetchStatus(), m.syncDetails(true)) }},
-		{key: ".", title: "Actions for selection…", group: "View", global: true, when: always, run: (*Model).contextMenu},
-		{key: "?", title: "Help & all commands", group: "View", global: true, when: always, run: (*Model).helpPalette},
-		{key: "ctrl+p", title: "Command palette", group: "View", global: true, when: always, run: (*Model).palette},
+		{key: ".", title: "Actions for selection…", group: "View", global: true, resolving: true, when: always, run: (*Model).contextMenu},
+		{key: "?", title: "Help & all commands", group: "View", global: true, resolving: true, when: always, run: (*Model).helpPalette},
+		{key: "ctrl+p", title: "Command palette", group: "View", global: true, resolving: true, when: always, run: (*Model).palette},
 	}
 }
 
@@ -212,7 +232,7 @@ var navHelp = [][2]string{
 
 func (m *Model) actionFor(key string, sel []entity) (action, bool) {
 	for _, a := range actions {
-		if a.key == key && a.when(m, sel) {
+		if a.key == key && m.offers(a, sel) {
 			return a, true
 		}
 	}
@@ -222,7 +242,7 @@ func (m *Model) actionFor(key string, sel []entity) (action, bool) {
 func (m *Model) available(sel []entity, includeGlobal bool) []action {
 	var out []action
 	for _, a := range actions {
-		if (includeGlobal || !a.global) && a.when(m, sel) {
+		if (includeGlobal || !a.global) && m.offers(a, sel) {
 			out = append(out, a)
 		}
 	}
@@ -243,7 +263,7 @@ func (m *Model) runPicked(it pickItem) tea.Cmd {
 		return nil
 	}
 	sel := m.subjects()
-	if !a.when(m, sel) {
+	if !m.offers(a, sel) {
 		return m.notify(toastInfo, a.title+" is not available for "+describeSel(sel))
 	}
 	return a.run(m, sel)
@@ -274,12 +294,12 @@ func (m *Model) contextMenu(sel []entity) tea.Cmd {
 
 func (m *Model) helpPalette(sel []entity) tea.Cmd {
 	var items []pickItem
-	for _, g := range []string{"Commit", "Branch", "History", "View"} {
+	for _, g := range []string{"Commit", "Conflicts", "Branch", "History", "View"} {
 		for _, a := range actions {
 			if a.group != g {
 				continue
 			}
-			items = append(items, pickItem{label: g + " · " + a.title, detail: a.key, value: a, dim: !a.when(m, sel)})
+			items = append(items, pickItem{label: g + " · " + a.title, detail: a.key, value: a, dim: !m.offers(a, sel)})
 		}
 	}
 	for _, n := range navHelp {

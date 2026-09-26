@@ -175,3 +175,38 @@ func TestE2EUncommitByDragging(t *testing.T) {
 	h.wantOnScreen("go.mod")
 	h.snap("done")
 }
+
+func TestE2EResolveInEditMode(t *testing.T) {
+	h, r := newRepoHarness(t)
+	if err := r.Conflict(); err != nil {
+		t.Fatal(err)
+	}
+	h.run(h.m.fetchStatus())
+	h.selectText("Start a changelog")
+	h.keys("d")
+	h.wantOnScreen("✗ Conflicted", "e resolves it in edit mode")
+	h.snap("conflicted")
+
+	h.keys("e")
+	h.wantOnScreen("You are editing commit", "Start a changelog", "CHANGELOG.md", "Conflicted", "Save and exit")
+	h.snap("edit-mode")
+
+	// Fix the file as an editor would; the view picks it up on the next refresh.
+	if err := os.WriteFile(filepath.Join(r.Dir, "CHANGELOG.md"), []byte("# Changelog\n\n- Health endpoint\n- Token auth\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.run(h.m.fetchStatus())
+	h.wantOnScreen("Resolved")
+	h.snap("resolved")
+
+	h.keys("e")
+	for _, st := range h.status().Stacks {
+		for _, b := range st.Branches {
+			if b.Name == "changelog" && b.Commits[0].Conflicted != nil && *b.Commits[0].Conflicted {
+				t.Fatal("saving left the commit conflicted")
+			}
+		}
+	}
+	h.wantOnScreen("Unstaged", "changelog", "Start a changelog")
+	h.snap("done")
+}

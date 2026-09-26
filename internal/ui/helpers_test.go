@@ -43,10 +43,16 @@ type fakeBut struct {
 
 func newFakeBut(t *testing.T, s *but.Status) (*but.Client, *fakeBut) {
 	t.Helper()
+	b, _ := json.Marshal(s)
+	return newFakeButJSON(t, string(b))
+}
+
+// newFakeButJSON serves status as given, for states Status can't marshal to.
+func newFakeButJSON(t *testing.T, status string) (*but.Client, *fakeBut) {
+	t.Helper()
 	dir := t.TempDir()
 	statusFile := filepath.Join(dir, "status.json")
-	b, _ := json.Marshal(s)
-	if err := os.WriteFile(statusFile, b, 0o644); err != nil {
+	if err := os.WriteFile(statusFile, []byte(status), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	f := &fakeBut{t: t, log: filepath.Join(dir, "log")}
@@ -93,7 +99,19 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	c, f := newFakeBut(t, testStatus())
+	return newHarnessWith(t, testStatus())
+}
+
+// newHarnessWith runs against a fake serving s, a *but.Status or raw status JSON.
+func newHarnessWith(t *testing.T, s any) *harness {
+	t.Helper()
+	var c *but.Client
+	var f *fakeBut
+	if raw, ok := s.(string); ok {
+		c, f = newFakeButJSON(t, raw)
+	} else {
+		c, f = newFakeBut(t, s.(*but.Status))
+	}
 	h := &harness{t: t, m: New(c, Options{}), but: f, wait: 150 * time.Millisecond}
 	h.send(tea.WindowSizeMsg{Width: 140, Height: 36})
 	h.run(h.m.fetchStatus())

@@ -37,6 +37,7 @@ Commands that don't return quickly (the refresh tick, toast timers) are dropped 
 | stack 3 | `empty`: no commits |
 | unapplied | `old-experiment`, 1 commit |
 | uncommitted | `README.md` and `src/server.go` modified, `src/util/strings.go` added, `docs/old.md` deleted |
+| `Repo.Conflict()` | adds `changelog` (a commit adding `CHANGELOG.md`) and pulls, which leaves that commit conflicted |
 
 `origin` is a local bare repository, so pushing works offline. `but` and git run with their own `HOME`, XDG dirs and a
 fixed identity (`testrepo.Env`), so your GitButler project list and settings are left alone. Commit dates are fixed,
@@ -46,6 +47,7 @@ To look at it yourself:
 
 ```sh
 mise run fixture   # prints the command to run buti against it
+go run ./internal/testrepo/mkrepo -conflict "$(mktemp -d)"   # with the conflicted commit
 ```
 
 `but` 0.22 has no command to assign a change to a stack, so the fixture has no assigned changes.
