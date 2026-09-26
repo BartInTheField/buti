@@ -20,7 +20,7 @@ build from source:
 go install github.com/bartinthefield/buti/cmd/buti@latest
 ```
 
-Every merge to `main` is released automatically, versioned with [CalVer](https://calver.org) as
+New commits on `main` are released automatically every hour, versioned with [CalVer](https://calver.org) as
 `YYYY.MM.DD.N`, where `N` counts the releases of that day (`2026.09.26.1`, `2026.09.26.2`, ...).
 buti checks for a newer release on start (at most once a day) and offers to update itself. Set
 `BUTI_NO_UPDATE_CHECK=1` to turn that off.
