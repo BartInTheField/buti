@@ -136,7 +136,7 @@ func (r fileRow) render(width int, selected bool, d rowDeco) string {
 	if d.marked {
 		lead = markGlyph + " "
 	}
-	return dimmed(fileLine(indent+lead, r.name, st.Render(letter), width, selected), d)
+	return dimmed(fileLine(indent+lead, r.name, withCount(st.Render(letter), d.comments), width, selected), d)
 }
 
 // fileLine renders "<prefix><name> … <tag>" with the tag flush right.

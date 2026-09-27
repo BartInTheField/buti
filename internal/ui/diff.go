@@ -50,6 +50,7 @@ type diffOpts struct {
 	// inside the selected hunk, and only when lines (and ranged) are set.
 	cursor, anchor int
 	lines, ranged  bool
+	note           string // id of the comment under the cursor, drawn selected
 }
 
 // diffRow is one line of a laid out diff, before hunk selection and marks are drawn.
@@ -61,6 +62,10 @@ type diffRow struct {
 	sign     byte
 	old, new int
 	code     string
+	// A row of an inline review comment box.
+	note string // the comment's id, "" for other rows
+	top  bool   // the box's first row, where the line cursor stops on the comment
+	alt  string // text drawn while the comment is under the cursor
 }
 
 // isLine reports whether the row is a diff line the line cursor can stop on.
@@ -68,11 +73,15 @@ func (r diffRow) isLine() bool {
 	return r.hunk >= 0 && !r.header && (r.sign == '+' || r.sign == '-' || r.sign == ' ')
 }
 
+// isNote reports whether the row is the top of a comment box, where the line cursor also stops.
+func (r diffRow) isNote() bool { return r.note != "" && r.top }
+
 // diffLayout is a diff highlighted and rendered at one width. Selection and
 // marks are applied on top by doc, so moving between hunks stays cheap.
 type diffLayout struct {
 	rows  []diffRow
 	hunks []hunkRef
+	numW  int // width of a line number in the gutter
 }
 
 // renderDiff draws a syntax highlighted unified diff at the given width.
@@ -93,6 +102,7 @@ func layoutDiff(d *but.Diff, width int) diffLayout {
 			numW = max(numW, len(strconv.Itoa(h.OldStart+h.OldLines)), len(strconv.Itoa(h.NewStart+h.NewLines)))
 		}
 	}
+	l.numW = numW
 	plain := func(text string) { l.rows = append(l.rows, diffRow{hunk: -1, text: text}) }
 	prevPath := ""
 	for _, f := range d.Changes {
@@ -180,6 +190,14 @@ func (l diffLayout) drawHunk(dst []string, i int, o diffOpts) {
 		switch {
 		case r.header:
 			dst[j] = bar + hh.Render(r.text)
+		case r.note != "" && sel && o.lines && r.note == o.note:
+			glyph := selBar + " "
+			if j == o.cursor {
+				glyph = cursorGlyph
+			}
+			dst[j] = glyph + r.alt
+		case r.note != "":
+			dst[j] = gutter + r.text
 		case !sel || !o.lines || j < lo || j > hi:
 			dst[j] = gutter + r.text
 		case j == o.cursor && o.ranged:

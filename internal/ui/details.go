@@ -33,7 +33,8 @@ type details struct {
 	err     error
 	data    *but.Diff
 	header  []string
-	layout  diffLayout // data rendered at layoutW, reused while only the selection changes
+	base    diffLayout // data rendered at layoutW, reused while only the selection or comments change
+	layout  diffLayout // base with the comment boxes
 	layoutD *but.Diff
 	layoutW int
 	marks   map[string]bool // hunk marks last drawn
@@ -46,6 +47,14 @@ type details struct {
 	anchor  int      // layout row where the range selection started; -1 for none
 	vp      viewport.Model
 	width   int
+
+	// Review comments: every located comment, of which the pane draws those on what it shows.
+	notes        []review.Located
+	notesVer     int    // bumped when notes change
+	notesDrawn   string // what the layout's comment boxes were drawn for
+	hideResolved bool
+	jump         string // id of a comment to put the cursor on once the diff arrives
+	reveal       string // id of a comment to scroll into view once it is drawn
 }
 
 type detailsMsg struct {
@@ -87,7 +96,7 @@ func (d *details) sync(c *but.Client, e entity, force bool) tea.Cmd {
 		return nil
 	}
 	if key != d.reqKey {
-		d.hunk, d.cursor, d.anchor = -1, -1, -1
+		d.hunk, d.cursor, d.anchor, d.reveal = -1, -1, -1, ""
 		d.vp.GotoTop()
 	}
 	d.reqKey, d.ent = key, e
@@ -156,8 +165,15 @@ func (d *details) rerender(marked ...map[string]bool) {
 		if d.focused {
 			sel = d.hunk
 		}
-		if w := max(d.width, 20); d.layoutD != d.data || d.layoutW != w {
-			d.layout, d.layoutD, d.layoutW = layoutDiff(d.data, w), d.data, w
+		keep := d.rowIDs()
+		w := max(d.width, 20)
+		if d.layoutD != d.data || d.layoutW != w {
+			d.base, d.layoutD, d.layoutW = layoutDiff(d.data, w), d.data, w
+			d.layout, d.notesDrawn = d.base, ""
+		}
+		if k := fmt.Sprint(d.notesVer, d.reqKey, d.hideResolved); k != d.notesDrawn {
+			d.layout, d.notesDrawn = d.base.withComments(d.notesShown(), w-2), k
+			d.restoreRows(keep)
 		}
 		d.fixCursor()
 		d.doc = d.layout.doc(d.opts(sel, d.marks))
@@ -167,6 +183,140 @@ func (d *details) rerender(marked ...map[string]bool) {
 	}
 	d.lines = lines
 	d.vp.SetContentLines(lines)
+	if d.jump != "" && d.data != nil && !d.loading {
+		d.jumpTo(d.jump)
+	}
+	if d.reveal != "" {
+		d.revealNote(d.reveal)
+	}
+}
+
+// revealNote scrolls a comment's box into view, keeping the line cursor on screen.
+func (d *details) revealNote(id string) {
+	end := -1
+	for i, r := range d.layout.rows {
+		if r.note == id {
+			end = i
+		}
+	}
+	if end < 0 {
+		return
+	}
+	d.reveal = ""
+	y, top := len(d.header)+end, len(d.header)+max(d.cursor, 0)
+	if y >= d.vp.YOffset()+d.vp.Height() {
+		d.vp.SetYOffset(min(y-d.vp.Height()+1, top))
+	}
+}
+
+// setNotes replaces the located review comments.
+func (d *details) setNotes(ls []review.Located) {
+	d.notes = ls
+	d.notesVer++
+}
+
+// notesShown are the comments on what the pane shows: uncommitted comments on an uncommitted diff, a commit's
+// comments on its diff. Orphaned comments have nowhere to go, and resolved ones can be hidden.
+func (d *details) notesShown() []review.Located {
+	var out []review.Located
+	for _, l := range d.notes {
+		a := l.Anchor
+		switch {
+		case l.Status == review.StatusOrphaned, d.hideResolved && !isOpen(l):
+			continue
+		case d.ent.kind.uncommitted() && a.Kind != review.KindCommit,
+			d.ent.kind == entCommit && a.Kind == review.KindCommit && matchesCommit(a, d.ent.commit),
+			d.ent.kind == entCommittedFile && a.Kind == review.KindCommit && matchesCommit(a, d.ent.commit) && a.Path == d.ent.label:
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// cursorNote is the comment under the line cursor.
+func (d *details) cursorNote() (review.Located, bool) {
+	rows := d.layout.rows
+	if !d.focused || d.cursor < 0 || d.cursor >= len(rows) || rows[d.cursor].note == "" {
+		return review.Located{}, false
+	}
+	for _, l := range d.notes {
+		if l.Comment.ID == rows[d.cursor].note {
+			return l, true
+		}
+	}
+	return review.Located{}, false
+}
+
+// jumpTo puts the line cursor on a comment.
+func (d *details) jumpTo(id string) {
+	d.jump = ""
+	for i, r := range d.layout.rows {
+		if r.note == id && r.top {
+			d.focused, d.anchor = true, -1
+			d.setCursor(i, d.marks)
+			return
+		}
+	}
+}
+
+// rowID identifies a layout row across relayouts, which shift rows when comment boxes come and go.
+type rowID struct {
+	hunk     int
+	sign     byte
+	old, new int
+	note     string
+}
+
+func (d *details) rowID(i int) (rowID, bool) {
+	if i < 0 || i >= len(d.layout.rows) {
+		return rowID{}, false
+	}
+	r := d.layout.rows[i]
+	if r.note != "" {
+		return rowID{hunk: r.hunk, note: r.note}, true
+	}
+	return rowID{hunk: r.hunk, sign: r.sign, old: r.old, new: r.new}, r.isLine()
+}
+
+// cursorRows remembers where the cursor and range are: each as its row, then the line above for a comment row,
+// in case that comment goes away.
+type cursorRows struct{ cursor, anchor []rowID }
+
+func (d *details) rowIDs() cursorRows {
+	ids := func(i int) []rowID {
+		var out []rowID
+		for ; i >= 0; i-- {
+			id, ok := d.rowID(i)
+			if ok {
+				out = append(out, id)
+				if id.note == "" {
+					break
+				}
+			}
+		}
+		return out
+	}
+	return cursorRows{cursor: ids(d.cursor), anchor: ids(d.anchor)}
+}
+
+// restoreRows moves the cursor and range back onto the rows they were on.
+func (d *details) restoreRows(k cursorRows) {
+	find := func(ids []rowID, fallback int) int {
+		for _, id := range ids {
+			for i := range d.layout.rows {
+				if got, ok := d.rowID(i); ok && got == id && (id.note == "" || d.layout.rows[i].top) {
+					return i
+				}
+			}
+		}
+		return fallback
+	}
+	if len(k.cursor) > 0 {
+		d.cursor = find(k.cursor, d.cursor)
+	}
+	if len(k.anchor) > 0 {
+		d.anchor = find(k.anchor, d.anchor)
+	}
 }
 
 // redraw updates the selection and marks by redrawing only the hunks that
@@ -212,8 +362,12 @@ func (d *details) focus(marks map[string]bool) {
 }
 
 func (d *details) opts(sel int, marks map[string]bool) diffOpts {
-	return diffOpts{selected: sel, marked: marks, cursor: d.cursor, anchor: d.anchor,
+	o := diffOpts{selected: sel, marked: marks, cursor: d.cursor, anchor: d.anchor,
 		lines: d.focused && d.cursor >= 0, ranged: d.anchor >= 0}
+	if d.cursor >= 0 && d.cursor < len(d.layout.rows) {
+		o.note = d.layout.rows[d.cursor].note
+	}
+	return o
 }
 
 // fixCursor keeps the line cursor and range inside the selected hunk after
@@ -224,7 +378,9 @@ func (d *details) fixCursor() {
 		d.cursor, d.anchor = -1, -1
 		return
 	}
-	in := func(r int) bool { return r >= 0 && r < len(rows) && rows[r].hunk == d.hunk && rows[r].isLine() }
+	in := func(r int) bool {
+		return r >= 0 && r < len(rows) && rows[r].hunk == d.hunk && (rows[r].isLine() || rows[r].isNote() && d.anchor < 0)
+	}
 	if !in(d.cursor) {
 		d.cursor, d.anchor = d.firstLine(d.hunk), -1
 	}
@@ -245,15 +401,15 @@ func (d *details) firstLine(i int) int {
 }
 
 // nextLine is the closest row after (dir > 0) or before row that the line
-// cursor can stop on, or -1. While a range is being selected it stays in the
-// range's hunk.
+// cursor can stop on (a line, or a comment), or -1. While a range is being
+// selected it stays in the range's hunk and skips comments.
 func (d *details) nextLine(row, dir int) int {
 	rows := d.layout.rows
 	for r := row + dir; r >= 0 && r < len(rows); r += dir {
 		if d.anchor >= 0 && rows[r].hunk != rows[d.anchor].hunk {
 			return -1
 		}
-		if rows[r].isLine() {
+		if rows[r].isLine() || rows[r].isNote() && d.anchor < 0 {
 			return r
 		}
 	}
@@ -261,20 +417,25 @@ func (d *details) nextLine(row, dir int) int {
 }
 
 // setCursor moves the line cursor to a row, selecting its hunk, and scrolls it
-// into view (with the hunk header when it is the hunk's first line).
+// into view: with the hunk header when it is the hunk's first line, and a
+// comment whole, with the line it is on.
 func (d *details) setCursor(row int, marks map[string]bool) {
 	rows := d.layout.rows
 	d.cursor, d.hunk = row, rows[row].hunk
 	d.redraw(marks)
-	top, y := len(d.header)+row, len(d.header)+row
-	if row > 0 && rows[row-1].header {
+	end := row
+	for rows[row].note != "" && end+1 < len(rows) && rows[end+1].note == rows[row].note && !rows[end+1].top {
+		end++
+	}
+	top, y := len(d.header)+row, len(d.header)+end
+	if row > 0 && (rows[row-1].header || rows[row].isNote()) {
 		top--
 	}
 	switch {
 	case top < d.vp.YOffset():
 		d.vp.SetYOffset(top)
 	case y >= d.vp.YOffset()+d.vp.Height():
-		d.vp.SetYOffset(y - d.vp.Height() + 1)
+		d.vp.SetYOffset(min(y-d.vp.Height()+1, top))
 	}
 }
 
@@ -311,6 +472,12 @@ func (d *details) clickLine(y int, extend bool, marks map[string]bool) {
 	switch {
 	case r.header:
 		d.selectHunk(r.hunk, marks)
+	case r.note != "":
+		for !d.layout.rows[row].top {
+			row--
+		}
+		d.anchor = -1
+		d.setCursor(row, marks)
 	case r.isLine():
 		if d.anchor >= 0 && d.layout.rows[d.anchor].hunk != r.hunk {
 			d.anchor = -1

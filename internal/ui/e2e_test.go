@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/bartinthefield/buti/internal/but"
+	"github.com/bartinthefield/buti/internal/review"
 	"github.com/bartinthefield/buti/internal/testrepo"
 )
 
@@ -36,7 +37,11 @@ func newRepoHarness(t *testing.T) (*harness, *testrepo.Repo) {
 		t.Fatal(err)
 	}
 	r.Setenv(t.Setenv) // the client inherits the environment
-	h := &harness{t: t, m: New(but.New(r.Dir), Options{}), wait: 2 * time.Second}
+	store, err := review.Open(r.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &harness{t: t, m: New(but.New(r.Dir), Options{Review: store}), wait: 2 * time.Second}
 	h.send(tea.WindowSizeMsg{Width: 160, Height: 40})
 	h.run(h.m.fetchStatus())
 	return h, r
@@ -249,4 +254,50 @@ func TestE2EDiffLineCursor(t *testing.T) {
 	}
 	h.wantOnScreen("cancel range")
 	h.snap("range")
+}
+
+func TestE2EReviewComments(t *testing.T) {
+	h, _ := newRepoHarness(t)
+	h.selectText("README.md")
+	h.keys("d")
+	h.click("## Usage")
+	h.keys("C")
+	h.typeText("Document the flags here too")
+	h.snap("composer")
+	h.keys("ctrl+s")
+	h.wantOnScreen("you · line 5", "Document the flags here too", "✎1")
+	h.snap("uncommitted")
+
+	h.selectText("Add users endpoint")
+	h.click(`"/health", "/users"`)
+	h.keys("C")
+	h.typeText("Keep the routes sorted, and say which ones need auth")
+	h.keys("ctrl+s")
+	h.wantOnScreen("you · line 3", "Keep the routes sorted", "✎1")
+	h.snap("commit")
+
+	// The agent resolves the README comment; the next refresh shows it.
+	cs, err := h.m.review.List()
+	if err != nil || len(cs) != 2 {
+		t.Fatalf("comments %+v, %v", cs, err)
+	}
+	if _, err := h.m.review.Resolve(cs[0].ID, "Listed -C, --diff and --remember-selection"); err != nil {
+		t.Fatal(err)
+	}
+	h.run(h.m.fetchStatus())
+	h.selectText("README.md")
+	h.wantOnScreen("✓ resolved · Document the flags here too — Listed -C")
+	h.snap("resolved")
+
+	h.keys("ctrl+p")
+	h.typeText("review comments")
+	h.keys("enter")
+	h.wantOnScreen("src/api/routes.go line 3")
+	h.snap("palette")
+	h.keys("enter")
+	if l, ok := h.m.det.cursorNote(); !ok || l.Comment.ID != cs[1].ID {
+		t.Fatalf("the palette did not jump to the comment:\n%s", h.screen())
+	}
+	h.wantOnScreen("e edit", "x resolve")
+	h.snap("jump")
 }

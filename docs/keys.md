@@ -24,6 +24,9 @@
 | `tab` | cycle focus: sidebar → lanes → details. In details: `j`/`k` move the line cursor (click a line to put it there), `J`/`K` scroll, `space` marks the cursor's hunk, then `c` / `r` / `x` on hunks |
 | `[` / `]` | in details: previous / next hunk |
 | `v` | in details: select a range of lines from the cursor (or shift-click); moving extends it, `v` or `esc` cancels |
+| `C` | in details: comment on the cursor's line or range (`ctrl+s` saves, `enter` is a new line) |
+| `e` / `d` / `x` | on a comment in details: edit / delete (after confirming) / resolve or reopen it |
+| `z` | show / hide resolved comments; **Review comments…** in the palette lists the open ones and jumps to them |
 | `y` / `Y` | copy (branch name, change id, path, hunk) / pick what to copy |
 | `o` / `O` | open a file in `$EDITOR` / with the default app; `o` on a branch with a pull request opens it in the browser |
 | `/` / `t` | go to anything (fuzzy) / go to a branch |

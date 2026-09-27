@@ -77,6 +77,26 @@ Releases are versioned with [CalVer](https://calver.org) as `YYYY.MM.DD.N`. buti
 in the help (`?`) or the command palette checks right away, and **Version** shows the version you're running. Builds
 without a release version (`go run`, `go install`) never check.
 
+## Review comments
+
+Leave comments on a diff for a coding agent to pick up with `/buti-resolve`:
+
+1. Put the line cursor on a line in the details pane (or select a range with `v`) and press `C`. Write the comment
+   (`enter` starts a new line) and save it with `ctrl+s`. Comments go on uncommitted changes, unassigned or assigned,
+   and on commits; a branch's diff has no stable place for them.
+2. The comment shows in a box under its last line. Files in **Unstaged** and in the lanes, and commits, show how many
+   open comments they have (`✎2`).
+3. `j`/`k` also stop on a comment. On one, `e` edits it, `d` deletes it after confirming, and `x` resolves or reopens it.
+4. Resolved and dismissed comments are collapsed to one muted line with the resolution; `z` hides or shows them.
+5. **Review comments…** in the command palette (`ctrl+p`) lists every open comment; `enter` opens its diff with the
+   cursor on it.
+
+buti reads the comments again whenever the workspace or the comment file changes (it checks every 3 seconds), so what
+an agent resolves or replies shows up on its own. A comment follows its line when lines move, an uncommitted
+comment follows its file into the commit it lands in, and a comment on a commit you uncommit or squash follows the
+lines the commit added or removed into the uncommitted changes or the other commit. One whose line is gone is marked
+outdated and drawn at the end of its file, with the text it was on.
+
 ## Review comments for coding agents
 
 Review comments live in `<git-common-dir>/buti/review.json`, which is never committed. A coding agent reads and closes

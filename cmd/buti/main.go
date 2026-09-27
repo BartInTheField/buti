@@ -80,6 +80,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if *remember {
 		opts.StateFile = stateFile(abs)
 	}
+	// Outside a git repository there is nowhere to keep review comments; buti works without them.
+	if store, err := review.Open(abs); err == nil {
+		opts.Review = store
+	}
 	p := tea.NewProgram(ui.New(but.New(abs), opts))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(stderr, "buti:", err)

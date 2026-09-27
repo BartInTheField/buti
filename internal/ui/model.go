@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/bartinthefield/buti/internal/but"
+	"github.com/bartinthefield/buti/internal/review"
 )
 
 const (
@@ -33,12 +34,13 @@ const (
 
 // Options configure a session.
 type Options struct {
-	Target      string // CLI id or branch name to select on start
-	ShowDetails bool   // open the details pane on start
-	StateFile   string // when set, the selection is saved here on quit and restored on start
-	Version     string // running version; only a release (see update.IsRelease) can update itself
-	UpdateCheck bool   // offer a newer release on start
-	UpdateCache string // where the latest release version is cached between runs
+	Target      string        // CLI id or branch name to select on start
+	ShowDetails bool          // open the details pane on start
+	StateFile   string        // when set, the selection is saved here on quit and restored on start
+	Version     string        // running version; only a release (see update.IsRelease) can update itself
+	UpdateCheck bool          // offer a newer release on start
+	UpdateCache string        // where the latest release version is cached between runs
+	Review      *review.Store // where review comments are kept; nil turns them off
 }
 
 type (
@@ -77,6 +79,14 @@ type Model struct {
 	modal   modal
 	det     details
 
+	// Review comments, located on the last status.
+	review      *review.Store
+	comments    []review.Located
+	commentsKey string // fingerprint of what they were located on
+	commentsSeq int    // last load started
+	commentsGot int    // last load received
+	commentsErr string // last load error, reported once
+
 	busy          string
 	spinner       spinner.Model
 	toasts        []toast
@@ -103,6 +113,7 @@ func New(client *but.Client, opts Options) Model {
 		showFiles:  map[string]bool{},
 		marks:      map[string]entity{},
 		det:        newDetails(),
+		review:     opts.Review,
 		spinner:    spinner.New(spinner.WithSpinner(spinner.MiniDot), spinner.WithStyle(titleStyle)),
 		fileCursor: -1,
 	}
@@ -161,8 +172,15 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 		m.err = msg.err
 		if msg.err == nil {
 			m.applyStatus(msg.status)
+			return m.loadComments(false)
 		}
 		return nil
+
+	case commentsMsg:
+		return m.receiveComments(msg)
+
+	case reviewDoneMsg:
+		return m.handleReviewDone(msg)
 
 	case detailsMsg:
 		m.det.receive(msg, m.hunkMarks())
@@ -753,6 +771,10 @@ func (m *Model) handleDetailsKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	if msg.String() == "esc" && d.cancelRange(marks) {
 		return nil, true
 	}
+	// On a comment, e, d and x act on it rather than on the pane or the hunk.
+	if a, ok := m.actionFor(msg.String(), m.subjects()); ok && a.group == "Review" {
+		return a.run(m, m.subjects()), true
+	}
 	switch msg.String() {
 	case "j", "down":
 		d.step(1, marks)
@@ -894,7 +916,7 @@ func scrollOffset(n, sel, h int) int {
 
 // deco decides how an entity is drawn in the current mode.
 func (m *Model) deco(e entity) rowDeco {
-	d := rowDeco{marked: m.marks[e.key()].kind != entNone}
+	d := rowDeco{marked: m.marks[e.key()].kind != entNone, comments: m.openComments(e)}
 	t, hover := m.target, m.selected()
 	if m.drag != nil {
 		t, hover = m.dragTarget()
@@ -1055,7 +1077,18 @@ func (m *Model) footer() string {
 		if m.det.anchor >= 0 {
 			hints = []string{"j/k", "extend", "v/esc", "cancel range"}
 		}
-		if m.det.ent.kind.uncommitted() {
+		if m.review != nil {
+			hints = append(hints[:2], append([]string{"C", "comment"}, hints[2:]...)...)
+		}
+		l, onNote := m.det.cursorNote()
+		switch {
+		case onNote:
+			resolve := "resolve"
+			if !isOpen(l) {
+				resolve = "reopen"
+			}
+			hints = []string{"j/k", "line", "e", "edit", "d", "delete", "x", resolve, "z", onOff("hide resolved", m.det.hideResolved)}
+		case m.det.ent.kind.uncommitted():
 			hints = append(hints, "space", "mark", "c", "commit", "r", "amend", "x", "discard")
 		}
 		msg = keyHints(append(hints, "y", "copy", "D", "full", "esc", "back")...)

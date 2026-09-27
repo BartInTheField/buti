@@ -25,6 +25,9 @@ h.dragTo("go.mod", "second")
 h.but.expect("amend --target c2 f2")
 ```
 
+`h.but.setDiff(d)` makes every `but diff` return `d`, for the details pane and for locating review comments; review
+comments go to a scratch store in `t.TempDir()` (`h.m.review`), since the fake is no git repository.
+
 Commands that don't return quickly (the refresh tick, toast timers) are dropped after `h.wait`, and animation frames
 (spinner, cursor blink) are dropped so they don't loop.
 
