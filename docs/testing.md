@@ -42,6 +42,8 @@ Commands that don't return quickly (the refresh tick, toast timers) are dropped 
 `origin` is a local bare repository, so pushing works offline. `but` and git run with their own `HOME`, XDG dirs and a
 fixed identity (`testrepo.Env`), so your GitButler project list and settings are left alone. Commit dates are fixed,
 but `but` gives every commit a random change id, so commit and CLI ids differ between runs: tests find things by name.
+Create the repository in `testrepo.TempDir(t)` rather than `t.TempDir()`: `but` can still be writing its settings
+under that `HOME` when a test ends, and `t.TempDir` fails the test when its cleanup loses that race.
 
 To look at it yourself:
 

@@ -31,7 +31,7 @@ func newRepoHarness(t *testing.T) (*harness, *testrepo.Repo) {
 	if _, err := exec.LookPath("but"); err != nil {
 		t.Skip("but not on PATH")
 	}
-	r, err := testrepo.Create(t.TempDir())
+	r, err := testrepo.Create(testrepo.TempDir(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,12 +98,19 @@ func (h *harness) snap(name string) {
 	if _, err := exec.LookPath("freeze"); err != nil {
 		return
 	}
-	cmd := exec.Command("freeze", "--language", "ansi", "--window=false", "--padding", "20",
-		"--font.size", "14", "--output", base+".png")
-	cmd.Stdin = strings.NewReader(content)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		h.t.Errorf("freeze %s: %v\n%s", name, err, out)
+	// freeze now and then crashes in the Go runtime on CI. The PNG is only for people to look at and the .ansi is
+	// saved, so a render that keeps failing is logged rather than failing a test whose assertions passed.
+	var out []byte
+	var err error
+	for range 3 {
+		cmd := exec.Command("freeze", "--language", "ansi", "--window=false", "--padding", "20",
+			"--font.size", "14", "--output", base+".png")
+		cmd.Stdin = strings.NewReader(content)
+		if out, err = cmd.CombinedOutput(); err == nil {
+			return
+		}
 	}
+	h.t.Logf("freeze %s: %v\n%.2000s", name, err, out)
 }
 
 func TestE2EWorkspace(t *testing.T) {

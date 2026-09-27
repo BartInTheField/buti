@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
 
@@ -51,6 +52,8 @@ func TestOpenPR(t *testing.T) {
 	t.Cleanup(func() { openURL = openExternal })
 
 	h := newHarness(t)
+	// `o` waits on `but branch show`, which a busy CI runner can take longer than the default wait to answer.
+	h.wait = time.Second
 	h.m.status.Stacks[0].Branches[1].ReviewID = "(#7)" // branch-1
 	// Answer `but branch show` like a forge that knows the PR.
 	script, _ := os.ReadFile(h.m.client.Bin)
