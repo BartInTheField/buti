@@ -280,3 +280,36 @@ func TestClickComment(t *testing.T) {
 		t.Fatalf("click did not select the comment:\n%s", h.screen())
 	}
 }
+
+// A comment an agent left with `buti review comment` shows its author, its severity tag and replies by either side.
+func TestAgentComment(t *testing.T) {
+	h := newHarness(t)
+	h.but.setDiff(fileDiff("f2", "go.mod", goModHunk))
+	c, err := h.m.review.Add(review.Anchor{Kind: review.KindUnassigned, Path: "go.mod", Line: 2, LineText: "go 1.22"},
+		"agent", "[must-fix] 1.22 is out of support")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.m.review.Reply(c.ID, review.AuthorUser, "Which one then?"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.m.review.Reply(c.ID, "agent", "1.23"); err != nil {
+		t.Fatal(err)
+	}
+	h.run(h.m.loadComments(true))
+	h.selectText("go.mod")
+	h.keys("D")
+	h.wantScreen("╭─ agent · line 2", "[must-fix] 1.22 is out of support", "↳ you: Which one then?", "↳ agent: 1.23")
+	raw := h.m.View().Content
+	if !strings.Contains(raw, severityStyles["[must-fix]"].Render("[must-fix]")) {
+		t.Errorf("the severity tag is not coloured:\n%q", raw)
+	}
+	if !strings.Contains(raw, noteAgentStyle.Render("agent")) {
+		t.Errorf("the agent is not set apart:\n%q", raw)
+	}
+
+	h.keys("esc", "ctrl+p")
+	h.typeText("review comments")
+	h.keys("enter")
+	h.wantScreen("go.mod line 2  [must-fix] 1.22 is out of support", "agent · zz")
+}

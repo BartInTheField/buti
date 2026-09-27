@@ -1,5 +1,5 @@
 // Package reviewcli implements `buti review`, the non-interactive commands a coding agent uses to read the review
-// comments left in buti and to resolve, reply to or dismiss them.
+// comments left in buti and to resolve, reply to or dismiss them, and to leave comments of its own.
 package reviewcli
 
 import (
@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -18,8 +19,9 @@ import (
 )
 
 // Usage lists the subcommands, for `buti --help` and `buti review --help`.
-const Usage = `buti review list [--status open|resolved|dismissed|outdated|orphaned|all] [--json]
+const Usage = `buti review list [--status open|resolved|dismissed|outdated|orphaned|all] [--author <name>] [--json]
 buti review show <id> [--json]
+buti review comment --file <path> --line <n> [--end-line <n>] [--side new|old] [--shortcode <id>] --body "<text>" [--author <name>]
 buti review resolve <id> [--summary "<text>"]
 buti review reply <id> --body "<text>" [--author <name>]
 buti review dismiss <id> [--reason "<text>"]
@@ -37,7 +39,7 @@ type Env struct {
 
 // NeedsBut reports whether the subcommand in args reads the workspace through `but`.
 func NeedsBut(args []string) bool {
-	return len(args) > 0 && (args[0] == "list" || args[0] == "show")
+	return len(args) > 0 && (args[0] == "list" || args[0] == "show" || args[0] == "comment")
 }
 
 // errUsage is a usage error that has already been reported.
@@ -73,6 +75,8 @@ func run(ctx context.Context, args []string, env Env) error {
 		return show(ctx, args, env)
 	case "resolve", "dismiss":
 		return closeComment(sub, args, env)
+	case "comment":
+		return comment(ctx, args, env)
 	case "reply":
 		return reply(args, env)
 	case "clear":
@@ -143,8 +147,9 @@ func statusFilter(s string) (stored []review.Status, keep func(review.Located) b
 }
 
 func list(ctx context.Context, args []string, env Env) error {
-	fs := flags("list", "buti review list [--status open|resolved|dismissed|outdated|orphaned|all] [--json]", env)
+	fs := flags("list", "buti review list [--status open|resolved|dismissed|outdated|orphaned|all] [--author <name>] [--json]", env)
 	status := fs.String("status", "open", "which comments to list: open, resolved, dismissed, outdated, orphaned or all")
+	author := fs.String("author", "", "only the comments by this author: user, agent or a name --author gave")
 	asJSON := fs.Bool("json", false, "print the comments as JSON")
 	if _, err := parse(fs, args, 0); err != nil {
 		return err
@@ -162,6 +167,9 @@ func list(ctx context.Context, args []string, env Env) error {
 	cs, err := s.List(stored...)
 	if err != nil {
 		return err
+	}
+	if *author != "" {
+		cs = slices.DeleteFunc(cs, func(c review.Comment) bool { return c.Author != *author })
 	}
 	items, err := locate(ctx, s, env.But, cs)
 	if err != nil {
@@ -181,17 +189,20 @@ func list(ctx context.Context, args []string, env Env) error {
 		return writeJSON(env.Stdout, js)
 	}
 	if len(out) == 0 {
+		what := *status + " comments"
 		if *status == "all" {
-			fmt.Fprintln(env.Stdout, "No comments.")
-		} else {
-			fmt.Fprintf(env.Stdout, "No %s comments.\n", *status)
+			what = "comments"
 		}
+		if *author != "" {
+			what += " by " + *author
+		}
+		fmt.Fprintf(env.Stdout, "No %s.\n", what)
 		return nil
 	}
 	tw := tabwriter.NewWriter(env.Stdout, 0, 0, 2, ' ', 0)
 	for _, it := range out {
 		first, _, _ := strings.Cut(it.Comment.Body, "\n")
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", it.Comment.ID, it.Status, dash(it.Target), it.where(), first)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", it.Comment.ID, it.Status, it.Comment.Author, dash(it.Target), it.where(), first)
 	}
 	return tw.Flush()
 }
@@ -439,6 +450,7 @@ func (it item) where() string {
 type jsonComment struct {
 	ID            string      `json:"id"`
 	Status        string      `json:"status"`
+	Author        string      `json:"author"`
 	Body          string      `json:"body"`
 	File          string      `json:"file"`
 	Line          int         `json:"line"`
@@ -461,7 +473,6 @@ type jsonCommit struct {
 // jsonDetail is `show --json`: the list fields plus the comment's history.
 type jsonDetail struct {
 	jsonComment
-	Author     string          `json:"author"`
 	CreatedAt  time.Time       `json:"created_at"`
 	Resolution *jsonResolution `json:"resolution"`
 	Replies    []jsonReply     `json:"replies"`
@@ -483,6 +494,7 @@ func (it item) json() jsonComment {
 	j := jsonComment{
 		ID:            it.Comment.ID,
 		Status:        string(it.Comment.Status),
+		Author:        it.Comment.Author,
 		Body:          it.Comment.Body,
 		File:          a.Path,
 		Line:          a.Line,
@@ -505,7 +517,7 @@ func (it item) json() jsonComment {
 
 func (it item) detailJSON() jsonDetail {
 	c := it.Comment
-	d := jsonDetail{jsonComment: it.json(), Author: c.Author, CreatedAt: c.CreatedAt, Replies: []jsonReply{}}
+	d := jsonDetail{jsonComment: it.json(), CreatedAt: c.CreatedAt, Replies: []jsonReply{}}
 	if c.Resolution.At != nil {
 		d.Resolution = &jsonResolution{Summary: c.Resolution.Summary, At: *c.Resolution.At}
 	}

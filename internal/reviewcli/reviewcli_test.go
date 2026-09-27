@@ -20,11 +20,14 @@ const (
 )
 
 // fakeStatus has README.md unassigned (rl), docs/a.md assigned to the stack of "docs" (k0), and a stack m0 whose
-// branch auth has a commit adding token.go.
+// branch auth (au) has a commit adding token.go (knl) and a newer one adding a line to it (tdy).
 var fakeStatus = but.Status{
 	UncommittedChanges: []but.Change{{CliID: "rl", FilePath: "README.md"}},
 	Stacks: []but.Stack{
-		{CliID: "m0", Branches: []but.Branch{{Name: "auth", Commits: []but.Commit{{
+		{CliID: "m0", Branches: []but.Branch{{CliID: "au", Name: "auth", Commits: []but.Commit{{
+			CliID: "tdy", ChangeID: "change-tidy", CommitID: "fedcba9876543210", Message: "Document the token",
+			Changes: []but.Change{{CliID: "t:m", FilePath: "src/auth/token.go"}},
+		}, {
 			CliID: "knl", ChangeID: "change-token", CommitID: "0123456789abcdef", Message: "Add token auth\n\nMore.",
 			Changes: []but.Change{{CliID: "k:m", FilePath: "src/auth/token.go"}},
 		}}}}},
@@ -37,6 +40,7 @@ var fakeDiffs = map[string]string{
 	"rl":  diffJSON("README.md", readmeHunk),
 	"k:m": diffJSON("src/auth/token.go", tokenHunk),
 	"rd":  diffJSON("docs/a.md", "@@ -0,0 +1,1 @@\n+hello\n"),
+	"t:m": diffJSON("src/auth/token.go", "@@ -1,3 +1,4 @@\n package auth\n \n "+tokenLine+"\n+// Token is for tests.\n"),
 }
 
 func diffJSON(path, hunk string) string {
@@ -145,24 +149,24 @@ func TestListJSON(t *testing.T) {
 	got := decode(t, h.ok("list", "--json"))
 	want := []map[string]any{
 		{
-			"id": usage.ID, "status": "open", "body": "Say more", "file": "README.md", "line": 5.0, "end_line": 5.0,
+			"id": usage.ID, "status": "open", "author": "user", "body": "Say more", "file": "README.md", "line": 5.0, "end_line": 5.0,
 			"side": "new", "shortcode": "zz", "file_shortcode": "rl", "kind": "unassigned", "branch": nil,
 			"commit": nil, "outdated": false,
 			"context": "  3 | A small service.\n  4 | \n> 5 | ## Usage\n  6 | \n  7 |     go run ./src",
 		},
 		{
-			"id": token.ID, "status": "open", "body": "Don't hard-code the token", "file": "src/auth/token.go",
+			"id": token.ID, "status": "open", "author": "user", "body": "Don't hard-code the token", "file": "src/auth/token.go",
 			"line": 3.0, "end_line": 3.0, "side": "new", "shortcode": "knl", "file_shortcode": "k:m", "kind": "commit",
 			"branch": "auth", "commit": map[string]any{"title": "Add token auth", "sha": "0123456789abcdef"},
 			"outdated": false, "context": "  1 | package auth\n  2 | \n> 3 | " + tokenLine,
 		},
 		{
-			"id": docs.ID, "status": "open", "body": "Hi", "file": "docs/a.md", "line": 1.0, "end_line": 1.0,
+			"id": docs.ID, "status": "open", "author": "user", "body": "Hi", "file": "docs/a.md", "line": 1.0, "end_line": 1.0,
 			"side": "new", "shortcode": "k0", "file_shortcode": "rd", "kind": "assigned", "branch": "docs",
 			"commit": nil, "outdated": false, "context": "> 1 | hello",
 		},
 		{
-			"id": gone.ID, "status": "open", "body": "Orphaned", "file": "src/x.go", "line": 1.0, "end_line": 1.0,
+			"id": gone.ID, "status": "open", "author": "user", "body": "Orphaned", "file": "src/x.go", "line": 1.0, "end_line": 1.0,
 			"side": "new", "shortcode": nil, "file_shortcode": nil, "kind": "commit", "branch": "auth",
 			"commit": map[string]any{"title": "", "sha": "fedcba"}, "outdated": true, "context": "> 1 | x",
 		},
@@ -250,7 +254,7 @@ func TestListText(t *testing.T) {
 	c := h.add(review.Anchor{Kind: review.KindCommit, ChangeID: "change-token", Path: "src/auth/token.go", Line: 1,
 		EndLine: 3, LineText: "package auth\n\n" + tokenLine}, "Rename this\nand that")
 	got := h.ok("list")
-	if want := c.ID + "  open  knl  src/auth/token.go:1-3  Rename this\n"; got != want {
+	if want := c.ID + "  open  user  knl  src/auth/token.go:1-3  Rename this\n"; got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }

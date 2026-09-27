@@ -44,7 +44,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr, "\nReview comments, for coding agents (no TUI):")
 		fmt.Fprintln(stderr, indentLines(reviewcli.Usage))
-		fmt.Fprintln(stderr, "\nAgent skills, such as /buti-resolve:")
+		fmt.Fprintln(stderr, "\nAgent skills, /buti-resolve and /buti-review:")
 		fmt.Fprintln(stderr, indentLines(skillUsage))
 	}
 	if err := fs.Parse(args); err != nil {

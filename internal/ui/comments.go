@@ -313,6 +313,9 @@ func (m *Model) commentsPicker([]entity) tea.Cmd {
 		case l.Anchor.Kind == review.KindCommit && len(l.Anchor.CommitID) >= 7:
 			detail += " " + l.Anchor.CommitID[:7]
 		}
+		if who := authorLabel(l.Comment.Author); who != "you" {
+			detail = who + " · " + detail
+		}
 		items = append(items, pickItem{label: label, detail: detail, value: l})
 	}
 	p := newPicker("Review comments · enter jumps to the line", items, func(m *Model, it pickItem) tea.Cmd {
@@ -362,7 +365,42 @@ var (
 	noteBorderStyle    = lipgloss.NewStyle().Foreground(colorMod)
 	noteSelBorderStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	noteAuthorStyle    = lipgloss.NewStyle().Foreground(colorText).Bold(true)
+	noteAgentStyle     = lipgloss.NewStyle().Foreground(colorPushed).Bold(true)
+
+	// severityStyles colour the tags /buti-review starts a comment with.
+	severityStyles = map[string]lipgloss.Style{
+		"[must-fix]":   lipgloss.NewStyle().Foreground(colorDel).Bold(true),
+		"[suggestion]": lipgloss.NewStyle().Foreground(colorMod).Bold(true),
+		"[nit]":        mutedStyle.Bold(true),
+		"[question]":   lipgloss.NewStyle().Foreground(colorAccent).Bold(true),
+	}
 )
+
+// authorLabel is how a comment's author is shown: "you" for the user, the stored name (such as "agent") otherwise.
+func authorLabel(author string) string {
+	if author == review.AuthorUser || author == "" {
+		return "you"
+	}
+	return author
+}
+
+// authorStyle sets comments from someone other than the user, such as a reviewing agent, apart.
+func authorStyle(author string) lipgloss.Style {
+	if author == review.AuthorUser || author == "" {
+		return noteAuthorStyle
+	}
+	return noteAgentStyle
+}
+
+// styleSeverity colours a leading severity tag, such as "[must-fix]", in a line of a comment's text.
+func styleSeverity(line string) string {
+	for tag, st := range severityStyles {
+		if rest, ok := strings.CutPrefix(line, tag); ok {
+			return st.Render(tag) + rest
+		}
+	}
+	return line
+}
 
 // noteRows renders a comment as the rows of the box drawn under its line, once as is and once selected. width is
 // the width of a diff line; the box is indented past the line number gutter by indent.
@@ -389,10 +427,7 @@ func noteRows(l review.Located, outdated bool, indent, width int) (plain, sel []
 		return []string{pre + mutedStyle.Render(text)}, []string{pre + noteSelBorderStyle.Render(text)}
 	}
 
-	author := c.Author
-	if author == review.AuthorUser {
-		author = "you"
-	}
+	author := authorStyle(c.Author).Render(authorLabel(c.Author))
 	at := "line " + itoa(l.Anchor.Line)
 	if l.Anchor.EndLine > l.Anchor.Line {
 		at = "lines " + itoa(l.Anchor.Line) + "–" + itoa(l.Anchor.EndLine)
@@ -419,13 +454,17 @@ func noteRows(l review.Located, outdated bool, indent, width int) (plain, sel []
 			}
 		}
 	}
+	first := len(body)
 	wrap("", c.Body)
+	if first < len(body) {
+		body[first] = styleSeverity(body[first])
+	}
 	for _, r := range c.Replies {
-		wrap(mutedStyle.Render("↳ ")+noteAuthorStyle.Render(r.Author)+mutedStyle.Render(": "), r.Body)
+		wrap(mutedStyle.Render("↳ ")+authorStyle(r.Author).Render(authorLabel(r.Author))+mutedStyle.Render(": "), r.Body)
 	}
 
 	draw := func(border lipgloss.Style) []string {
-		head := noteAuthorStyle.Render(author) + mutedStyle.Render(" · "+at)
+		head := author + mutedStyle.Render(" · "+at)
 		left := border.Render("╭─ ") + head + " "
 		right := " " + mutedStyle.Render(c.ID) + border.Render(" ─╮")
 		fill := bw - ansi.StringWidth(left) - ansi.StringWidth(right)

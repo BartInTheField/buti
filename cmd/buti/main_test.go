@@ -187,7 +187,8 @@ func TestSkillCommands(t *testing.T) {
 		return err == nil && bytes.Equal(data, want)
 	}
 
-	if code, out, _ := runButi("skill", "list"); code != 0 || !strings.Contains(out, "buti-resolve\n") {
+	if code, out, _ := runButi("skill", "list"); code != 0 || !strings.Contains(out, "buti-resolve\n") ||
+		!strings.Contains(out, "buti-review\n") {
 		t.Errorf("list: exit %d, %q", code, out)
 	}
 	if code, out, _ := runButi("skill", "show", "buti-resolve"); code != 0 || out != string(want) {
@@ -200,6 +201,12 @@ func TestSkillCommands(t *testing.T) {
 	if code, out, stderr := runButi("skill", "install", "--agent", "claude"); code != 0 ||
 		!installed(filepath.Join(home, ".claude", "skills")) || !strings.Contains(out, "installed buti-resolve to ") {
 		t.Errorf("install --agent claude: exit %d, %q %q", code, out, stderr)
+	}
+	// Without names, install copies every skill: /buti-review too.
+	review, _ := skills.Read("buti-review")
+	if data, err := os.ReadFile(filepath.Join(home, ".claude", "skills", "buti-review", "SKILL.md")); err != nil ||
+		!bytes.Equal(data, review) {
+		t.Errorf("install --agent claude did not install buti-review (%v)", err)
 	}
 	if code, _, stderr := runButi("skill", "install", "buti-resolve", "--agent", "opencode"); code != 0 ||
 		!installed(filepath.Join(home, ".config", "opencode", "skills")) {

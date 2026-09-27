@@ -13,6 +13,7 @@ import (
 
 	"github.com/bartinthefield/buti/internal/but"
 	"github.com/bartinthefield/buti/internal/review"
+	"github.com/bartinthefield/buti/internal/reviewcli"
 	"github.com/bartinthefield/buti/internal/testrepo"
 )
 
@@ -300,4 +301,59 @@ func TestE2EReviewComments(t *testing.T) {
 	}
 	h.wantOnScreen("e edit", "x resolve")
 	h.snap("jump")
+}
+
+// An agent reviews with `buti review comment` (as /buti-review does), and buti shows its comments.
+func TestE2EAgentReview(t *testing.T) {
+	h, r := newRepoHarness(t)
+	agent := func(args ...string) string {
+		t.Helper()
+		var out, errOut strings.Builder
+		code := reviewcli.Run(context.Background(), append([]string{"comment"}, args...), reviewcli.Env{
+			Stdout: &out, Stderr: &errOut, But: but.New(r.Dir),
+			Store: func() (*review.Store, error) { return review.Open(r.Dir) },
+		})
+		if code != 0 {
+			t.Fatalf("buti review comment %v: exit %d\n%s", args, code, errOut.String())
+		}
+		return out.String()
+	}
+	agent("--file", "README.md", "--line", "7",
+		"--body", "[suggestion] Say which flags `go run` takes, or link to the usage docs")
+	agent("--shortcode", "auth", "--file", "src/auth/token.go", "--line", "3",
+		"--body", "[must-fix] The token is hard-coded; read it from the environment")
+	agent("--shortcode", "auth", "--file", "src/auth/token_test.go", "--line", "5",
+		"--body", "[question] Should this test check the token at all?")
+
+	h.run(h.m.loadComments(true))
+	h.selectText("README.md")
+	h.keys("d")
+	h.wantOnScreen("agent · line 7", "[suggestion] Say which flags", "✎1")
+	h.snap("uncommitted")
+
+	h.selectText("Add token auth")
+	h.wantOnScreen("agent · line 3", "[must-fix] The token is hard-coded", "✎1")
+	h.snap("commit")
+
+	cs, err := h.m.review.List()
+	if err != nil || len(cs) != 3 {
+		t.Fatalf("comments %+v, %v", cs, err)
+	}
+	for _, c := range cs {
+		if c.Author != "agent" {
+			t.Errorf("comment %s by %q", c.ID, c.Author)
+		}
+	}
+	if a := cs[1].Anchor; a.Kind != review.KindCommit || a.Branch != "auth" || a.LineText != `func Token() string { return "secret" }` {
+		t.Errorf("commit anchor %+v", a)
+	}
+	if a := cs[2].Anchor; a.Kind != review.KindCommit || a.LineText != "func TestToken(t *testing.T) {}" {
+		t.Errorf("test anchor %+v", a)
+	}
+
+	h.keys("ctrl+p")
+	h.typeText("review comments")
+	h.keys("enter")
+	h.wantOnScreen("README.md line 7  [suggestion]", "agent · zz", "src/auth/token.go line 3  [must-fix]")
+	h.snap("palette")
 }

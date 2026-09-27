@@ -12,8 +12,10 @@ import (
 // TestSkillFiles checks that each skill has the front matter agents need to load it, named after its directory.
 func TestSkillFiles(t *testing.T) {
 	names := Names()
-	if !slices.Contains(names, "buti-resolve") {
-		t.Fatalf("Names() = %v, want buti-resolve", names)
+	for _, want := range []string{"buti-resolve", "buti-review"} {
+		if !slices.Contains(names, want) {
+			t.Fatalf("Names() = %v, want %s", names, want)
+		}
 	}
 	for _, n := range names {
 		data, err := Read(n)
@@ -49,6 +51,42 @@ func TestResolveSkillCommands(t *testing.T) {
 		"but amend <that id> -t <commit shortcode>",
 		"never run git write commands",
 	} {
+		if !bytes.Contains(data, []byte(want)) {
+			t.Errorf("SKILL.md does not mention %q", want)
+		}
+	}
+}
+
+// TestReviewSkillCommands keeps /buti-review in step with the commands and tags it relies on.
+func TestReviewSkillCommands(t *testing.T) {
+	data, err := Read("buti-review")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"which buti",
+		"install.sh",
+		"but status -f",
+		"but diff <commit>",
+		"buti review list --status all --json",
+		"buti review comment --file <path> --line <n> [--end-line <n>] [--side new|old] [--shortcode <id>] --body",
+		"[must-fix]", "[suggestion]", "[nit]", "[question]",
+		"never run git write commands",
+		"/buti-resolve",
+	} {
+		if !bytes.Contains(data, []byte(want)) {
+			t.Errorf("SKILL.md does not mention %q", want)
+		}
+	}
+}
+
+// TestResolveSkillAuthors checks that /buti-resolve handles comments a reviewing agent left.
+func TestResolveSkillAuthors(t *testing.T) {
+	data, err := Read("buti-resolve")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"`author`", "--author agent", "[must-fix]", "[question]"} {
 		if !bytes.Contains(data, []byte(want)) {
 			t.Errorf("SKILL.md does not mention %q", want)
 		}

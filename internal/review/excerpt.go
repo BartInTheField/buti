@@ -52,3 +52,23 @@ func Excerpt(fd *but.FileDiff, a Anchor, around int) string {
 	}
 	return strings.TrimSuffix(b.String(), "\n")
 }
+
+// LinesAt returns the text of lines line..end on side of fd, newline separated as an anchor stores it, and whether
+// the diff shows every one of them. A line is on the new side as added or context, on the old side as removed or
+// context.
+func LinesAt(fd *but.FileDiff, side Side, line, end int) (text string, changed, ok bool) {
+	if fd == nil || line < 1 || end < line {
+		return "", false, false
+	}
+	lines := sideLines(fd, side)
+	ts := make([]string, 0, end-line+1)
+	for n := line; n <= end; n++ {
+		l, found := lines[n]
+		if !found {
+			return "", false, false
+		}
+		changed = changed || l.changed
+		ts = append(ts, l.text)
+	}
+	return strings.Join(ts, "\n"), changed, true
+}
