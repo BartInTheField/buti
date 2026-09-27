@@ -20,7 +20,7 @@ func TestIntegration(t *testing.T) {
 	if _, err := exec.LookPath("but"); err != nil {
 		t.Skip("but not on PATH")
 	}
-	dir, home := t.TempDir(), t.TempDir()
+	dir, home := t.TempDir(), testrepo.TempDir(t)
 	for _, kv := range testrepo.Env(home) {
 		k, v, _ := strings.Cut(kv, "=")
 		t.Setenv(k, v) // for git below and for the client
@@ -188,7 +188,7 @@ func TestIntegrationResolve(t *testing.T) {
 	if _, err := exec.LookPath("but"); err != nil {
 		t.Skip("but not on PATH")
 	}
-	r, err := testrepo.Create(t.TempDir())
+	r, err := testrepo.Create(testrepo.TempDir(t))
 	if err == nil {
 		err = r.Conflict()
 	}

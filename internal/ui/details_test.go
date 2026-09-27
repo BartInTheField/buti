@@ -5,9 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/bartinthefield/buti/internal/but"
+	"github.com/bartinthefield/buti/internal/review"
 )
 
 func testDiff(files, hunks int) *but.Diff {
@@ -36,7 +38,7 @@ func TestSelectHunkRedrawsInPlace(t *testing.T) {
 	d.selectHunk(0, nil)
 	d.selectHunk(2, map[string]bool{"f0": true})
 
-	want := renderDiff(d.data, 60, diffOpts{selected: 2, marked: map[string]bool{"f0": true}}).String()
+	want := renderDiff(d.data, 60, diffOpts{selected: 2, marked: map[string]bool{"f0": true}, cursor: d.cursor, lines: true}).String()
 	if got := strings.Join(d.lines[:len(d.lines)-detailsTail], "\n"); got != want {
 		t.Fatalf("redrawn content differs from a full render:\n%s\n--- want ---\n%s", got, want)
 	}
@@ -60,7 +62,7 @@ func TestViewDoesNotRerender(t *testing.T) {
 	}
 }
 
-// j and k scroll through a hunk taller than the pane before moving on.
+// j and k move the line cursor through a hunk taller than the pane, scrolling with it.
 func TestStepScrollsThroughTallHunk(t *testing.T) {
 	h := newHarness(t)
 	h.keys("D")
@@ -77,7 +79,7 @@ func TestStepScrollsThroughTallHunk(t *testing.T) {
 	short.Diff.Hunks = []but.Hunk{{OldStart: 1, OldLines: 1, NewStart: 1, NewLines: 1, Diff: "@@ -1,1 +1,1 @@\n-a\n+b\n"}}
 	h.send(detailsMsg{key: h.m.det.reqKey, diff: &but.Diff{Changes: []but.FileDiff{fd, short}}})
 
-	for range 56 { // 90 content lines in a 34 line pane
+	for range 88 { // the first j puts the cursor on line 1; 90 content lines in a 34 line pane
 		h.keys("j")
 	}
 	if h.m.det.hunk != 0 || !strings.Contains(h.screen(), "line 88") {
@@ -96,11 +98,133 @@ func TestStepScrollsThroughTallHunk(t *testing.T) {
 			t.Fatalf("no blank space below the end of the diff:\n%s", h.screen())
 		}
 	}
-	h.keys("k")
-	for range 60 {
+	for range 90 {
 		h.keys("k")
 	}
 	if h.m.det.hunk != 0 || !strings.Contains(h.screen(), "line 1 ") {
 		t.Fatalf("k did not scroll back to the top of the tall hunk:\n%s", h.screen())
+	}
+}
+
+// commitDiff is a two file commit diff: a.go with a context line, a removal and
+// two additions; b.go with one hunk after an unchanged stretch.
+func commitDiff() *but.Diff {
+	a := but.FileDiff{Path: "a.go", Status: "modified"}
+	a.Diff.Type = "patch"
+	a.Diff.Hunks = []but.Hunk{{OldStart: 3, OldLines: 2, NewStart: 3, NewLines: 3,
+		Diff: "@@ -3,2 +3,3 @@\n ctx\n-gone\n+one\n+two\n"}}
+	b := but.FileDiff{Path: "b.go", Status: "modified"}
+	b.Diff.Type = "patch"
+	b.Diff.Hunks = []but.Hunk{{OldStart: 10, OldLines: 1, NewStart: 10, NewLines: 1,
+		Diff: "@@ -10,1 +10,1 @@\n-x := 1\n+x := 2\n"}}
+	return &but.Diff{Changes: []but.FileDiff{a, b}}
+}
+
+func (h *harness) lineSel() lineSel {
+	h.t.Helper()
+	s, ok := h.m.det.lineSelection()
+	if !ok {
+		h.t.Fatalf("no line selection:\n%s", h.screen())
+	}
+	return s
+}
+
+// j and k move the line cursor line by line, across files, and report where it is.
+func TestLineCursorLocation(t *testing.T) {
+	h := newHarness(t)
+	h.selectText("first")
+	h.keys("D")
+	h.send(detailsMsg{key: h.m.det.reqKey, diff: commitDiff()})
+	h.keys("j") // the cursor starts on the first line
+	want := []struct {
+		path string
+		side review.Side
+		line int
+		text string
+	}{
+		{"a.go", review.SideNew, 3, "ctx"},
+		{"a.go", review.SideOld, 4, "gone"},
+		{"a.go", review.SideNew, 4, "one"},
+		{"a.go", review.SideNew, 5, "two"},
+		{"b.go", review.SideOld, 10, "x := 1"},
+		{"b.go", review.SideNew, 10, "x := 2"},
+	}
+	check := func(i int) {
+		t.Helper()
+		w, s := want[i], h.lineSel()
+		if s.path != w.path || s.side != w.side || s.line != w.line || s.endLine != w.line || s.text != w.text {
+			t.Fatalf("line %d: got %s %s %d-%d %q, want %s %s %d %q", i, s.path, s.side, s.line, s.endLine, s.text,
+				w.path, w.side, w.line, w.text)
+		}
+	}
+	for i := range want {
+		if i > 0 {
+			h.keys("j")
+		}
+		check(i)
+	}
+	h.keys("j") // past the last line it scrolls; the cursor stays
+	check(len(want) - 1)
+	for i := len(want) - 2; i >= 0; i-- {
+		h.keys("k")
+		check(i)
+	}
+	if h.m.det.hunk != 0 {
+		t.Fatalf("hunk %d, want 0", h.m.det.hunk)
+	}
+	h.keys("]")
+	check(4)
+	h.keys("[")
+	check(0)
+}
+
+// v selects a range that moving the cursor extends, within the hunk; esc cancels it.
+func TestLineRangeSelection(t *testing.T) {
+	h := newHarness(t)
+	h.selectText("first")
+	h.keys("D")
+	h.send(detailsMsg{key: h.m.det.reqKey, diff: commitDiff()})
+	h.keys("j", "v", "j", "j")
+	s := h.lineSel()
+	if s.path != "a.go" || s.side != review.SideNew || s.line != 3 || s.endLine != 4 || s.text != "ctx\none" {
+		t.Fatalf("range with a removed line: %+v", s)
+	}
+	h.keys("j", "j", "j") // stops at the end of the hunk
+	if s := h.lineSel(); s.path != "a.go" || s.line != 3 || s.endLine != 5 {
+		t.Fatalf("range left the hunk: %+v", s)
+	}
+	if !strings.Contains(h.screen(), "▌┃") || !strings.Contains(h.screen(), "esc cancel range") {
+		t.Fatalf("range not drawn:\n%s", h.screen())
+	}
+	h.keys("esc")
+	if s := h.lineSel(); s.line != 5 || s.endLine != 5 || !h.m.det.focused {
+		t.Fatalf("esc did not just cancel the range: %+v focused %v", s, h.m.det.focused)
+	}
+	h.keys("k", "k", "v", "k") // old lines only: the range is on the old side
+	h.keys("j")
+	if s := h.lineSel(); s.side != review.SideOld || s.line != 4 || s.endLine != 4 || s.text != "gone" {
+		t.Fatalf("range on a removed line: %+v", s)
+	}
+	h.keys("v")
+	if h.m.det.anchor >= 0 {
+		t.Fatal("v did not end the range")
+	}
+}
+
+// Clicking a line moves the cursor there; shift-click extends a range.
+func TestClickLine(t *testing.T) {
+	h := newHarness(t)
+	h.selectText("first")
+	h.keys("D")
+	h.send(detailsMsg{key: h.m.det.reqKey, diff: commitDiff()})
+	h.click("x := 2")
+	if s := h.lineSel(); s.path != "b.go" || s.side != review.SideNew || s.line != 10 {
+		t.Fatalf("click on b.go line 10: %+v", s)
+	}
+	h.click("ctx")
+	x, y := h.find("two")
+	h.send(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft, Mod: tea.ModShift})
+	if s := h.lineSel(); s.path != "a.go" || s.line != 3 || s.endLine != 5 {
+		t.Fatalf("shift-click range: %+v", s)
 	}
 }

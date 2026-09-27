@@ -21,8 +21,9 @@ var (
 )
 
 type diffLine struct {
-	sign     byte // '+', '-', ' ' or '\\' (no newline marker)
-	old, new int  // line numbers; 0 when absent on that side
+	sign     byte   // '+', '-', ' ' or '\\' (no newline marker)
+	old, new int    // line numbers; 0 when absent on that side
+	code     string // the line as in the file, without the sign
 	segs     []segment
 }
 
@@ -45,6 +46,11 @@ type diffDoc struct {
 type diffOpts struct {
 	selected int             // hunk index drawn as selected, -1 for none
 	marked   map[string]bool // hunk ids drawn as marked
+	// The line cursor and range selection, as rows. They are only drawn
+	// inside the selected hunk, and only when lines (and ranged) are set.
+	cursor, anchor int
+	lines, ranged  bool
+	note           string // id of the comment under the cursor, drawn selected
 }
 
 // diffRow is one line of a laid out diff, before hunk selection and marks are drawn.
@@ -52,13 +58,30 @@ type diffRow struct {
 	hunk   int    // index into the hunks, -1 for lines outside a hunk
 	header bool   // the hunk's @@ line; text is unstyled and already truncated
 	text   string // the rendered line, without the two column hunk gutter
+	// The diff line the row shows, for the line cursor.
+	sign     byte
+	old, new int
+	code     string
+	// A row of an inline review comment box.
+	note string // the comment's id, "" for other rows
+	top  bool   // the box's first row, where the line cursor stops on the comment
+	alt  string // text drawn while the comment is under the cursor
 }
+
+// isLine reports whether the row is a diff line the line cursor can stop on.
+func (r diffRow) isLine() bool {
+	return r.hunk >= 0 && !r.header && (r.sign == '+' || r.sign == '-' || r.sign == ' ')
+}
+
+// isNote reports whether the row is the top of a comment box, where the line cursor also stops.
+func (r diffRow) isNote() bool { return r.note != "" && r.top }
 
 // diffLayout is a diff highlighted and rendered at one width. Selection and
 // marks are applied on top by doc, so moving between hunks stays cheap.
 type diffLayout struct {
 	rows  []diffRow
 	hunks []hunkRef
+	numW  int // width of a line number in the gutter
 }
 
 // renderDiff draws a syntax highlighted unified diff at the given width.
@@ -79,6 +102,7 @@ func layoutDiff(d *but.Diff, width int) diffLayout {
 			numW = max(numW, len(strconv.Itoa(h.OldStart+h.OldLines)), len(strconv.Itoa(h.NewStart+h.NewLines)))
 		}
 	}
+	l.numW = numW
 	plain := func(text string) { l.rows = append(l.rows, diffRow{hunk: -1, text: text}) }
 	prevPath := ""
 	for _, f := range d.Changes {
@@ -107,7 +131,8 @@ func layoutDiff(d *but.Diff, width int) diffLayout {
 			header, lines := parseHunk(f.Path, h)
 			l.rows = append(l.rows, diffRow{hunk: idx, header: true, text: ansi.Truncate(header, max(width-2, 1), "…")})
 			for _, dl := range lines {
-				l.rows = append(l.rows, diffRow{hunk: idx, text: renderDiffLine(dl, numW, width-2)})
+				l.rows = append(l.rows, diffRow{hunk: idx, text: renderDiffLine(dl, numW, width-2),
+					sign: dl.sign, old: dl.old, new: dl.new, code: dl.code})
 			}
 			ref.end = len(l.rows)
 			l.hunks = append(l.hunks, ref)
@@ -134,6 +159,12 @@ var (
 	selBarGlyph    = lipgloss.NewStyle().Foreground(colorAccent).Render("▶ ")
 	selGutterGlyph = lipgloss.NewStyle().Foreground(colorAccent).Render("▌ ")
 	selHunkHeader  = hunkHeaderStyle.Bold(true).Reverse(true)
+
+	// The line cursor and range sit in the second gutter column, next to the hunk bar.
+	selBar           = lipgloss.NewStyle().Foreground(colorAccent).Render("▌")
+	cursorGlyph      = selBar + lipgloss.NewStyle().Foreground(colorText).Bold(true).Render("▶")
+	rangeGlyph       = selBar + lipgloss.NewStyle().Foreground(colorMod).Render("┃")
+	rangeCursorGlyph = selBar + lipgloss.NewStyle().Foreground(colorMod).Bold(true).Render("▶")
 )
 
 // drawHunk writes hunk i's lines into dst, which is indexed like the rows.
@@ -150,11 +181,31 @@ func (l diffLayout) drawHunk(dst []string, i int, o diffOpts) {
 	if sel {
 		hh, gutter = selHunkHeader, selGutterGlyph
 	}
+	lo, hi := o.cursor, o.cursor
+	if o.ranged {
+		lo, hi = min(o.cursor, o.anchor), max(o.cursor, o.anchor)
+	}
 	for j := ref.line; j < ref.end; j++ {
-		if r := l.rows[j]; r.header {
+		r := l.rows[j]
+		switch {
+		case r.header:
 			dst[j] = bar + hh.Render(r.text)
-		} else {
+		case r.note != "" && sel && o.lines && r.note == o.note:
+			glyph := selBar + " "
+			if j == o.cursor {
+				glyph = cursorGlyph
+			}
+			dst[j] = glyph + r.alt
+		case r.note != "":
 			dst[j] = gutter + r.text
+		case !sel || !o.lines || j < lo || j > hi:
+			dst[j] = gutter + r.text
+		case j == o.cursor && o.ranged:
+			dst[j] = rangeCursorGlyph + r.text
+		case j == o.cursor:
+			dst[j] = cursorGlyph + r.text
+		default:
+			dst[j] = rangeGlyph + r.text
 		}
 	}
 }
@@ -198,7 +249,7 @@ func parseHunk(path string, h but.Hunk) (string, []diffLine) {
 		if r == "" {
 			r = " "
 		}
-		l := diffLine{sign: r[0]}
+		l := diffLine{sign: r[0], code: r[1:]}
 		switch r[0] {
 		case '-':
 			l.old, l.segs = h.OldStart+oi, at(oldHL, oi)

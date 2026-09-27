@@ -25,7 +25,30 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"testing"
+	"time"
 )
+
+// TempDir is t.TempDir for a test that runs `but`: its cleanup retries for a few seconds, because `but` can still
+// be writing its settings under HOME when the test ends, and t.TempDir fails the test when removal loses that race.
+func TempDir(t testing.TB) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "buti-"+strings.ReplaceAll(t.Name(), "/", "_"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+			if err = os.RemoveAll(dir); err == nil || time.Now().After(deadline) {
+				break
+			}
+		}
+		if err != nil {
+			t.Logf("leaving %s: %v", dir, err)
+		}
+	})
+	return dir
+}
 
 // Repo is a fixture repository.
 type Repo struct {

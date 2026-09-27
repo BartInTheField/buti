@@ -12,6 +12,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/bartinthefield/buti/internal/but"
+	"github.com/bartinthefield/buti/internal/review"
+	"github.com/bartinthefield/buti/internal/reviewcli"
 	"github.com/bartinthefield/buti/internal/testrepo"
 )
 
@@ -31,12 +33,16 @@ func newRepoHarness(t *testing.T) (*harness, *testrepo.Repo) {
 	if _, err := exec.LookPath("but"); err != nil {
 		t.Skip("but not on PATH")
 	}
-	r, err := testrepo.Create(t.TempDir())
+	r, err := testrepo.Create(testrepo.TempDir(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	r.Setenv(t.Setenv) // the client inherits the environment
-	h := &harness{t: t, m: New(but.New(r.Dir), Options{}), wait: 2 * time.Second}
+	store, err := review.Open(r.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &harness{t: t, m: New(but.New(r.Dir), Options{Review: store}), wait: 2 * time.Second}
 	h.send(tea.WindowSizeMsg{Width: 160, Height: 40})
 	h.run(h.m.fetchStatus())
 	return h, r
@@ -98,12 +104,19 @@ func (h *harness) snap(name string) {
 	if _, err := exec.LookPath("freeze"); err != nil {
 		return
 	}
-	cmd := exec.Command("freeze", "--language", "ansi", "--window=false", "--padding", "20",
-		"--font.size", "14", "--output", base+".png")
-	cmd.Stdin = strings.NewReader(content)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		h.t.Errorf("freeze %s: %v\n%s", name, err, out)
+	// freeze now and then crashes in the Go runtime on CI. The PNG is only for people to look at and the .ansi is
+	// saved, so a render that keeps failing is logged rather than failing a test whose assertions passed.
+	var out []byte
+	var err error
+	for range 3 {
+		cmd := exec.Command("freeze", "--language", "ansi", "--window=false", "--padding", "20",
+			"--font.size", "14", "--output", base+".png")
+		cmd.Stdin = strings.NewReader(content)
+		if out, err = cmd.CombinedOutput(); err == nil {
+			return
+		}
 	}
+	h.t.Logf("freeze %s: %v\n%.2000s", name, err, out)
 }
 
 func TestE2EWorkspace(t *testing.T) {
@@ -220,4 +233,127 @@ func TestE2EResolveInEditMode(t *testing.T) {
 	}
 	h.wantOnScreen("Unstaged", "changelog", "Start a changelog")
 	h.snap("done")
+}
+
+func TestE2EDiffLineCursor(t *testing.T) {
+	h, _ := newRepoHarness(t)
+	h.selectText("Add users endpoint")
+	h.keys("d", "tab")
+	for range 4 {
+		h.keys("j")
+	}
+	s, ok := h.m.det.lineSelection()
+	if !ok || s.path == "" || s.line == 0 {
+		t.Fatalf("no line under the cursor: %+v", s)
+	}
+	h.wantOnScreen("j/k line")
+	h.snap("cursor")
+
+	h.keys("v", "j", "j")
+	if s, _ := h.m.det.lineSelection(); s.endLine <= s.line {
+		t.Fatalf("range not extended: %+v", s)
+	}
+	h.wantOnScreen("cancel range")
+	h.snap("range")
+}
+
+func TestE2EReviewComments(t *testing.T) {
+	h, _ := newRepoHarness(t)
+	h.selectText("README.md")
+	h.keys("d")
+	h.click("## Usage")
+	h.keys("C")
+	h.typeText("Document the flags here too")
+	h.snap("composer")
+	h.keys("ctrl+s")
+	h.wantOnScreen("you · line 5", "Document the flags here too", "✎1")
+	h.snap("uncommitted")
+
+	h.selectText("Add users endpoint")
+	h.click(`"/health", "/users"`)
+	h.keys("C")
+	h.typeText("Keep the routes sorted, and say which ones need auth")
+	h.keys("ctrl+s")
+	h.wantOnScreen("you · line 3", "Keep the routes sorted", "✎1")
+	h.snap("commit")
+
+	// The agent resolves the README comment; the next refresh shows it.
+	cs, err := h.m.review.List()
+	if err != nil || len(cs) != 2 {
+		t.Fatalf("comments %+v, %v", cs, err)
+	}
+	if _, err := h.m.review.Resolve(cs[0].ID, "Listed -C, --diff and --remember-selection"); err != nil {
+		t.Fatal(err)
+	}
+	h.run(h.m.fetchStatus())
+	h.selectText("README.md")
+	h.wantOnScreen("✓ resolved · Document the flags here too — Listed -C")
+	h.snap("resolved")
+
+	h.keys("ctrl+p")
+	h.typeText("review comments")
+	h.keys("enter")
+	h.wantOnScreen("src/api/routes.go line 3")
+	h.snap("palette")
+	h.keys("enter")
+	if l, ok := h.m.det.cursorNote(); !ok || l.Comment.ID != cs[1].ID {
+		t.Fatalf("the palette did not jump to the comment:\n%s", h.screen())
+	}
+	h.wantOnScreen("e edit", "x resolve")
+	h.snap("jump")
+}
+
+// An agent reviews with `buti review comment` (as /buti-review does), and buti shows its comments.
+func TestE2EAgentReview(t *testing.T) {
+	h, r := newRepoHarness(t)
+	agent := func(args ...string) string {
+		t.Helper()
+		var out, errOut strings.Builder
+		code := reviewcli.Run(context.Background(), append([]string{"comment"}, args...), reviewcli.Env{
+			Stdout: &out, Stderr: &errOut, But: but.New(r.Dir),
+			Store: func() (*review.Store, error) { return review.Open(r.Dir) },
+		})
+		if code != 0 {
+			t.Fatalf("buti review comment %v: exit %d\n%s", args, code, errOut.String())
+		}
+		return out.String()
+	}
+	agent("--file", "README.md", "--line", "7",
+		"--body", "[suggestion] Say which flags `go run` takes, or link to the usage docs")
+	agent("--shortcode", "auth", "--file", "src/auth/token.go", "--line", "3",
+		"--body", "[must-fix] The token is hard-coded; read it from the environment")
+	agent("--shortcode", "auth", "--file", "src/auth/token_test.go", "--line", "5",
+		"--body", "[question] Should this test check the token at all?")
+
+	h.run(h.m.loadComments(true))
+	h.selectText("README.md")
+	h.keys("d")
+	h.wantOnScreen("agent · line 7", "[suggestion] Say which flags", "✎1")
+	h.snap("uncommitted")
+
+	h.selectText("Add token auth")
+	h.wantOnScreen("agent · line 3", "[must-fix] The token is hard-coded", "✎1")
+	h.snap("commit")
+
+	cs, err := h.m.review.List()
+	if err != nil || len(cs) != 3 {
+		t.Fatalf("comments %+v, %v", cs, err)
+	}
+	for _, c := range cs {
+		if c.Author != "agent" {
+			t.Errorf("comment %s by %q", c.ID, c.Author)
+		}
+	}
+	if a := cs[1].Anchor; a.Kind != review.KindCommit || a.Branch != "auth" || a.LineText != `func Token() string { return "secret" }` {
+		t.Errorf("commit anchor %+v", a)
+	}
+	if a := cs[2].Anchor; a.Kind != review.KindCommit || a.LineText != "func TestToken(t *testing.T) {}" {
+		t.Errorf("test anchor %+v", a)
+	}
+
+	h.keys("ctrl+p")
+	h.typeText("review comments")
+	h.keys("enter")
+	h.wantOnScreen("README.md line 7  [suggestion]", "agent · zz", "src/auth/token.go line 3  [must-fix]")
+	h.snap("palette")
 }

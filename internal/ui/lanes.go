@@ -47,11 +47,12 @@ func phantomLane() lane {
 
 // rowDeco is how the current mode wants a row drawn.
 type rowDeco struct {
-	marked bool
-	dim    bool   // not a valid target in the current mode
-	source bool   // the thing being committed/squashed/moved
-	tag    string // operation label on a hovered target, e.g. "amend"
-	insert int    // -1/+1: draw an insertion marker above/below the row
+	marked   bool
+	dim      bool   // not a valid target in the current mode
+	source   bool   // the thing being committed/squashed/moved
+	tag      string // operation label on a hovered target, e.g. "amend"
+	insert   int    // -1/+1: draw an insertion marker above/below the row
+	comments int    // open review comments on it, for a badge
 }
 
 type decoFunc func(entity) rowDeco
@@ -140,7 +141,7 @@ func (l lane) render(width, sel int, deco decoFunc) laneView {
 			prefix = markGlyph + " "
 		}
 		boxItems[len(box)] = item
-		box = append(box, dimmed(fileLine(prefix, c.FilePath, st.Render(letter), inner, item == sel), d))
+		box = append(box, dimmed(fileLine(prefix, c.FilePath, withCount(st.Render(letter), d.comments), inner, item == sel), d))
 		item++
 	}
 	box = append(box, buttonStyle.Width(inner).Align(lipgloss.Center).Render("Start a commit…"))
@@ -211,7 +212,7 @@ func (l lane) render(width, sel int, deco decoFunc) laneView {
 			if subject == "" {
 				subject = mutedStyle.Italic(true).Render("(no message)")
 			}
-			row := fileLine(dot+" ", subject, mutedStyle.Render(c.ShortID()), inner, item == sel)
+			row := fileLine(dot+" ", subject, withCount(mutedStyle.Render(c.ShortID()), cd.comments), inner, item == sel)
 			if cd.tag != "" || cd.source {
 				row = withTag(fileLine(dot+" ", subject, "", inner-ansi.StringWidth(cd.tag)-3, item == sel), inner, cd)
 			}
@@ -239,7 +240,7 @@ func (l lane) render(width, sel int, deco decoFunc) laneView {
 					prefix = " " + markGlyph
 				}
 				bodyItems[len(body)] = item
-				body = append(body, dimmed(withTag(fileLine(prefix+" ", fe.label, st.Render(letter), inner, item == sel), inner, fd), fd))
+				body = append(body, dimmed(withTag(fileLine(prefix+" ", fe.label, withCount(st.Render(letter), fd.comments), inner, item == sel), inner, fd), fd))
 				item++
 			}
 		}

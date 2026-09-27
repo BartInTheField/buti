@@ -16,9 +16,10 @@ const (
 	composeCommit composeKind = iota
 	composeSquash
 	composeReword
+	composeComment // a review comment: a body only
 )
 
-// composerModal edits a commit message: a subject line plus an optional body.
+// composerModal edits a commit message (a subject line plus an optional body), or a review comment.
 type composerModal struct {
 	kind      composeKind
 	context   string // what the message is for, e.g. "Commit 3 files to feat-x"
@@ -47,7 +48,19 @@ func newComposer(kind composeKind, context, initial string, onSubmit func(*Model
 	return &composerModal{kind: kind, context: context, subject: s, body: b, onSubmit: onSubmit}
 }
 
+// newCommentComposer edits a review comment; context says where it is.
+func newCommentComposer(context, initial string, onSubmit func(*Model, string) tea.Cmd) *composerModal {
+	c := newComposer(composeComment, context, "", onSubmit)
+	c.body.Placeholder = "What should change here?"
+	c.body.SetValue(initial)
+	c.setFocusBody(true)
+	return c
+}
+
 func (c *composerModal) message() string {
+	if c.kind == composeComment {
+		return strings.TrimSpace(c.body.Value())
+	}
 	subj := strings.TrimSpace(c.subject.Value())
 	body := strings.TrimSpace(c.body.Value())
 	if body == "" {
@@ -75,6 +88,13 @@ func (c *composerModal) update(m *Model, msg tea.Msg) tea.Cmd {
 		case "ctrl+s", "ctrl+enter":
 			m.closeModal()
 			return c.onSubmit(m, c.message())
+		}
+		if c.kind == composeComment {
+			var cmd tea.Cmd
+			c.body, cmd = c.body.Update(msg) // enter is a new line
+			return cmd
+		}
+		switch k.String() {
 		case "ctrl+e":
 			if c.onEditor != nil {
 				m.closeModal()
@@ -115,7 +135,7 @@ func (c *composerModal) view(width, height int) string {
 	c.body.SetWidth(inner)
 	c.body.SetHeight(clamp(height-16, 3, 10))
 
-	title := map[composeKind]string{composeCommit: "Commit", composeSquash: "Squash", composeReword: "Reword"}[c.kind]
+	title := map[composeKind]string{composeCommit: "Commit", composeSquash: "Squash", composeReword: "Reword", composeComment: "Comment"}[c.kind]
 	field := func(label string, focused bool, content string) string {
 		st := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(colorBorder).Width(inner).Padding(0, 1)
 		if focused {
@@ -130,9 +150,12 @@ func (c *composerModal) view(width, height int) string {
 	}
 
 	var hints []string
-	if c.focusBody {
+	switch {
+	case c.kind == composeComment:
+		hints = []string{"ctrl+s", "save", "enter", "new line"}
+	case c.focusBody:
 		hints = []string{"ctrl+s", "save", "tab", "subject"}
-	} else {
+	default:
 		hints = []string{"enter", "save", "tab", "description"}
 	}
 	if c.onEditor != nil {
@@ -140,13 +163,14 @@ func (c *composerModal) view(width, height int) string {
 	}
 	hints = append(hints, "esc", "cancel")
 
-	parts := []string{
-		modalTitle(title) + "  " + mutedStyle.Render(ansi.Truncate(c.context, inner-len(title)-2, "…")),
-		"",
+	head := modalTitle(title) + "  " + mutedStyle.Render(ansi.Truncate(c.context, inner-len(title)-2, "…"))
+	parts := []string{head, "",
 		field("Subject  "+counter, !c.focusBody, c.subject.View()),
 		field("Description", c.focusBody, c.body.View()),
-		"",
-		keyHints(hints...),
+		"", keyHints(hints...),
+	}
+	if c.kind == composeComment {
+		parts = []string{head, "", field("For the agent that picks it up with /buti-resolve", true, c.body.View()), "", keyHints(hints...)}
 	}
 	return modalStyle.Width(w).Render(strings.Join(parts, "\n"))
 }

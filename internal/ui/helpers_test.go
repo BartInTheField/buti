@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/bartinthefield/buti/internal/but"
+	"github.com/bartinthefield/buti/internal/review"
 )
 
 func testStatus() *but.Status {
@@ -37,8 +38,9 @@ func testStatus() *but.Status {
 
 // fakeBut installs a `but` stand-in that logs its arguments and serves status.
 type fakeBut struct {
-	t   *testing.T
-	log string
+	t    *testing.T
+	log  string
+	diff string // served for every `but diff`
 }
 
 func newFakeBut(t *testing.T, s *but.Status) (*but.Client, *fakeBut) {
@@ -55,12 +57,12 @@ func newFakeButJSON(t *testing.T, status string) (*but.Client, *fakeBut) {
 	if err := os.WriteFile(statusFile, []byte(status), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	f := &fakeBut{t: t, log: filepath.Join(dir, "log")}
+	f := &fakeBut{t: t, log: filepath.Join(dir, "log"), diff: filepath.Join(dir, "diff.json")}
 	script := "#!/bin/sh\n" +
 		"case \"$1\" in\n" +
 		"  status) case \"$*\" in *--refresh-prs*) echo \"$*\" >> '" + f.log + "' ;; esac\n" +
 		"    cat '" + statusFile + "' ;;\n" +
-		"  diff) echo '{\"changes\":[]}' ;;\n" +
+		"  diff) if [ -f '" + f.diff + "' ]; then cat '" + f.diff + "'; else echo '{\"changes\":[]}'; fi ;;\n" +
 		"  *) echo \"$*\" >> '" + f.log + "' ;;\n" +
 		"esac\n"
 	bin := filepath.Join(dir, "but")
@@ -80,6 +82,18 @@ func (f *fakeBut) calls() []string {
 		return nil
 	}
 	return strings.Split(s, "\n")
+}
+
+// setDiff makes every `but diff` return d.
+func (f *fakeBut) setDiff(d *but.Diff) {
+	f.t.Helper()
+	b, err := json.Marshal(d)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	if err := os.WriteFile(f.diff, b, 0o644); err != nil {
+		f.t.Fatal(err)
+	}
 }
 
 func (f *fakeBut) expect(want ...string) {
@@ -103,6 +117,18 @@ func newHarness(t *testing.T) *harness {
 	return newHarnessWith(t, testStatus())
 }
 
+// memDir is a scratch directory in memory where there is one (/dev/shm on Linux). A comment write syncs the file,
+// which on a busy CI runner's disk can take longer than h.wait, and the harness would then drop the write.
+func memDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("/dev/shm", "buti-test-")
+	if err != nil {
+		return t.TempDir()
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
+
 // newHarnessWith runs against a fake serving s, a *but.Status or raw status JSON.
 func newHarnessWith(t *testing.T, s any) *harness {
 	t.Helper()
@@ -113,7 +139,9 @@ func newHarnessWith(t *testing.T, s any) *harness {
 	} else {
 		c, f = newFakeBut(t, s.(*but.Status))
 	}
-	h := &harness{t: t, m: New(c, Options{}), but: f, wait: 150 * time.Millisecond}
+	// The fake is no git repository, so review.Open would fail: comments go to a scratch file.
+	store := review.New(filepath.Join(memDir(t), "review.json"))
+	h := &harness{t: t, m: New(c, Options{Review: store}), but: f, wait: 150 * time.Millisecond}
 	h.send(tea.WindowSizeMsg{Width: 140, Height: 36})
 	h.run(h.m.fetchStatus())
 	return h

@@ -58,6 +58,11 @@ func hasUncommitted(m *Model) bool {
 	return false
 }
 
+// detailsLines reports whether the details pane has focus and a line cursor.
+func detailsLines(m *Model, _ []entity) bool {
+	return (m.det.focused || m.det.full) && m.det.cursor >= 0
+}
+
 func verbAvailable(v verb) func(*Model, []entity) bool {
 	return func(m *Model, sel []entity) bool {
 		if _, why := sourcesFor(v, sel); why != "" {
@@ -71,6 +76,15 @@ var actions []action
 
 func init() {
 	actions = []action{
+		// Review comments. They come first: on a comment in the details pane, e, d and x act on it.
+		{key: "C", title: "Comment on the line…", group: "Review", when: canComment, run: (*Model).startComment},
+		{key: "e", title: "Edit comment…", group: "Review", when: onComment, run: (*Model).editComment},
+		{key: "d", title: "Delete comment…", group: "Review", when: onComment, run: (*Model).deleteComment},
+		{key: "x", title: "Resolve / reopen comment", group: "Review", when: onComment, run: (*Model).toggleCommentResolved},
+		{key: "z", title: "Show / hide resolved comments", group: "Review", global: true, when: hasReview,
+			run: (*Model).toggleResolvedComments},
+		{title: "Review comments…", group: "Review", global: true, when: hasReview, run: (*Model).commentsPicker},
+
 		// Changes and commits.
 		{key: "c", title: "Commit…", group: "Commit", when: verbAvailable(verbCommit),
 			run: func(m *Model, sel []entity) tea.Cmd { return m.enterTarget(verbCommit, sel) }},
@@ -210,12 +224,21 @@ func init() {
 			}},
 		{key: "y", title: "Copy", group: "View", when: one(entBranch, entCommit, entFile, entCommittedFile, entHunk), run: (*Model).copyQuick},
 		{key: "Y", title: "Copy…", group: "View", when: one(entBranch, entCommit, entFile, entCommittedFile, entHunk), run: (*Model).copyPicker},
+		{key: "v", title: "Select a range of lines", group: "View", when: detailsLines,
+			run: func(m *Model, _ []entity) tea.Cmd { m.det.toggleRange(m.hunkMarks()); return nil }},
+		{key: "]", title: "Next hunk", group: "View", global: true, when: detailsLines,
+			run: func(m *Model, _ []entity) tea.Cmd { m.det.stepHunk(1, m.hunkMarks()); return nil }},
+		{key: "[", title: "Previous hunk", group: "View", global: true, when: detailsLines,
+			run: func(m *Model, _ []entity) tea.Cmd { m.det.stepHunk(-1, m.hunkMarks()); return nil }},
 		{key: "/", title: "Go to…", group: "View", global: true, when: always, run: (*Model).gotoPicker},
 		{key: "t", title: "Go to branch…", group: "View", global: true, when: always, run: (*Model).branchPicker},
 		{key: ":", title: "Run a but command…", group: "View", global: true, resolving: true, when: always, run: (*Model).butPrompt},
 		{key: "!", title: "Run a shell command…", group: "View", global: true, resolving: true, when: always, run: (*Model).shellPrompt},
 		{key: "ctrl+r", title: "Reload", group: "View", global: true, resolving: true, when: always,
-			run: func(m *Model, _ []entity) tea.Cmd { return tea.Batch(m.fetchSyncedStatus(), m.syncDetails(true)) }},
+			run: func(m *Model, _ []entity) tea.Cmd {
+				m.commentsKey = "" // locate again, for lines that moved in files `but status` shows unchanged
+				return tea.Batch(m.fetchSyncedStatus(), m.syncDetails(true))
+			}},
 		{title: "Version", group: "View", global: true, resolving: true, when: always, run: (*Model).showVersion},
 		{title: "Update buti", group: "View", global: true, resolving: true, when: always, run: (*Model).checkUpdateNow},
 		{key: ".", title: "Actions for selection…", group: "View", global: true, resolving: true, when: always, run: (*Model).contextMenu},
@@ -228,6 +251,7 @@ func init() {
 var navHelp = [][2]string{
 	{"j/k ↑/↓", "move"}, {"h/l ←/→", "previous / next column"}, {"tab", "cycle sidebar, lanes, details"},
 	{"J/K", "next / previous branch"}, {"g/G", "top / bottom"}, {"ctrl+d/u", "move 10 rows"},
+	{"j/k in details", "move the line cursor · click: to a line, shift: extend a range"},
 	{"+/-", "resize details"}, {"esc", "back: clear marks, leave mode, close"}, {"q", "quit"},
 	{"click", "select · double-click: diff · right-click: actions"}, {"drag", "drop onto a branch, commit or “new branch”"},
 }
@@ -296,7 +320,7 @@ func (m *Model) contextMenu(sel []entity) tea.Cmd {
 
 func (m *Model) helpPalette(sel []entity) tea.Cmd {
 	var items []pickItem
-	for _, g := range []string{"Commit", "Conflicts", "Branch", "History", "View"} {
+	for _, g := range []string{"Commit", "Conflicts", "Branch", "History", "Review", "View"} {
 		for _, a := range actions {
 			if a.group != g {
 				continue

@@ -6,6 +6,9 @@ There are three layers, from fast and fake to slow and real:
 |---|---|---|---|
 | UI unit tests | `internal/ui/*_test.go` | a fake shell script | `mise run test` |
 | Client integration test | `internal/but/integration_test.go` | real | `mise run test:integration` |
+| Re-anchoring integration test | `internal/review/locate_integration_test.go` | real, in the test repository | `mise run test:integration` |
+| `buti review` CLI tests | `internal/reviewcli/*_test.go` | a fake shell script | `mise run test` |
+| `buti review` integration test | `cmd/buti/main_test.go` | real, in the test repository | `mise run test:integration` |
 | UI end-to-end tests | `internal/ui/e2e_test.go` | real, in the test repository | `mise run test:integration` |
 
 The real-`but` tests are skipped unless `BUTI_INTEGRATION=1` is set and `but` is on `PATH`.
@@ -21,6 +24,9 @@ h := newHarness(t)
 h.dragTo("go.mod", "second")
 h.but.expect("amend --target c2 f2")
 ```
+
+`h.but.setDiff(d)` makes every `but diff` return `d`, for the details pane and for locating review comments; review
+comments go to a scratch store in `t.TempDir()` (`h.m.review`), since the fake is no git repository.
 
 Commands that don't return quickly (the refresh tick, toast timers) are dropped after `h.wait`, and animation frames
 (spinner, cursor blink) are dropped so they don't loop.
@@ -42,6 +48,8 @@ Commands that don't return quickly (the refresh tick, toast timers) are dropped 
 `origin` is a local bare repository, so pushing works offline. `but` and git run with their own `HOME`, XDG dirs and a
 fixed identity (`testrepo.Env`), so your GitButler project list and settings are left alone. Commit dates are fixed,
 but `but` gives every commit a random change id, so commit and CLI ids differ between runs: tests find things by name.
+Create the repository in `testrepo.TempDir(t)` rather than `t.TempDir()`: `but` can still be writing its settings
+under that `HOME` when a test ends, and `t.TempDir` fails the test when its cleanup loses that race.
 
 To look at it yourself:
 
