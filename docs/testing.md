@@ -6,6 +6,7 @@ There are three layers, from fast and fake to slow and real:
 |---|---|---|---|
 | UI unit tests | `internal/ui/*_test.go` | a fake shell script | `mise run test` |
 | Client integration test | `internal/but/integration_test.go` | real | `mise run test:integration` |
+| Re-anchoring integration test | `internal/review/locate_integration_test.go` | real, in the test repository | `mise run test:integration` |
 | UI end-to-end tests | `internal/ui/e2e_test.go` | real, in the test repository | `mise run test:integration` |
 
 The real-`but` tests are skipped unless `BUTI_INTEGRATION=1` is set and `but` is on `PATH`.

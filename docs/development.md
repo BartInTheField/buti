@@ -34,7 +34,9 @@ The integration tests and the fixture need the [GitButler CLI](https://docs.gitb
   - `details.go`, `diff.go`, `highlight.go`: the details pane and diffs
   - `compose.go`, `modal.go`, `toast.go`: the message composer, dialogs, notifications
   - `update.go`: offering and installing a new release
-- `internal/review`: the review comment store, `<git-common-dir>/buti/review.json`, shared by the TUI and the CLI
+- `internal/review`: the review comment store, `<git-common-dir>/buti/review.json`, shared by the TUI and the CLI.
+  `Locate` / `Store.Reanchor` map the stored anchors onto the current `but status`, deriving each comment's shortcode,
+  its moved line, and the outdated and orphaned statuses
 - `internal/update`: finding the latest release and replacing the running binary
 - `internal/testrepo`: the test repository (see [Testing](testing.md))
 
