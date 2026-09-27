@@ -43,6 +43,7 @@ type hit struct {
 	// Where the entity lives, to select it.
 	files      bool
 	row        int // file row, -1 for the header
+	line       int // content line in the details pane, -1 on its title bar
 	lane, item int
 	key        string
 }
@@ -65,7 +66,7 @@ func (m *Model) hitTest(x, y int) hit {
 		if y == 0 && x >= m.width-8 {
 			return hit{kind: hitDetailsClose}
 		}
-		return hit{kind: hitDetails}
+		return hit{kind: hitDetails, line: y - 1}
 	}
 	sw := m.sidebarWidth()
 	if x < sw {
@@ -83,7 +84,7 @@ func (m *Model) hitTest(x, y int) hit {
 	}
 	lanesH, detH := m.split()
 	if detH > 0 && y > lanesH {
-		return hit{kind: hitDetails}
+		return hit{kind: hitDetails, line: y - lanesH - 2} // below the rule and the title bar
 	}
 	if y >= lanesH {
 		return hit{}
@@ -190,11 +191,12 @@ func (m *Model) handleClick(msg tea.MouseClickMsg) tea.Cmd {
 		m.det.full, m.det.focused = false, false
 		return nil
 	case hitDetails:
+		marks := m.hunkMarks()
 		if !m.det.focused {
-			m.det.focused = true
-			if m.det.hunk < 0 {
-				m.det.selectHunk(0, m.hunkMarks())
-			}
+			m.det.focus(marks)
+		}
+		if h.line >= 0 {
+			m.det.clickLine(h.line, msg.Mod&tea.ModShift != 0, marks)
 		}
 		return nil
 	case hitButton:

@@ -58,6 +58,11 @@ func hasUncommitted(m *Model) bool {
 	return false
 }
 
+// detailsLines reports whether the details pane has focus and a line cursor.
+func detailsLines(m *Model, _ []entity) bool {
+	return (m.det.focused || m.det.full) && m.det.cursor >= 0
+}
+
 func verbAvailable(v verb) func(*Model, []entity) bool {
 	return func(m *Model, sel []entity) bool {
 		if _, why := sourcesFor(v, sel); why != "" {
@@ -210,6 +215,12 @@ func init() {
 			}},
 		{key: "y", title: "Copy", group: "View", when: one(entBranch, entCommit, entFile, entCommittedFile, entHunk), run: (*Model).copyQuick},
 		{key: "Y", title: "Copy…", group: "View", when: one(entBranch, entCommit, entFile, entCommittedFile, entHunk), run: (*Model).copyPicker},
+		{key: "v", title: "Select a range of lines", group: "View", when: detailsLines,
+			run: func(m *Model, _ []entity) tea.Cmd { m.det.toggleRange(m.hunkMarks()); return nil }},
+		{key: "]", title: "Next hunk", group: "View", global: true, when: detailsLines,
+			run: func(m *Model, _ []entity) tea.Cmd { m.det.stepHunk(1, m.hunkMarks()); return nil }},
+		{key: "[", title: "Previous hunk", group: "View", global: true, when: detailsLines,
+			run: func(m *Model, _ []entity) tea.Cmd { m.det.stepHunk(-1, m.hunkMarks()); return nil }},
 		{key: "/", title: "Go to…", group: "View", global: true, when: always, run: (*Model).gotoPicker},
 		{key: "t", title: "Go to branch…", group: "View", global: true, when: always, run: (*Model).branchPicker},
 		{key: ":", title: "Run a but command…", group: "View", global: true, resolving: true, when: always, run: (*Model).butPrompt},
@@ -228,6 +239,7 @@ func init() {
 var navHelp = [][2]string{
 	{"j/k ↑/↓", "move"}, {"h/l ←/→", "previous / next column"}, {"tab", "cycle sidebar, lanes, details"},
 	{"J/K", "next / previous branch"}, {"g/G", "top / bottom"}, {"ctrl+d/u", "move 10 rows"},
+	{"j/k in details", "move the line cursor · click: to a line, shift: extend a range"},
 	{"+/-", "resize details"}, {"esc", "back: clear marks, leave mode, close"}, {"q", "quit"},
 	{"click", "select · double-click: diff · right-click: actions"}, {"drag", "drop onto a branch, commit or “new branch”"},
 }

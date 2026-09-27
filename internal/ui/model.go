@@ -523,8 +523,8 @@ func (m *Model) syncDetails(force bool) tea.Cmd {
 func (m *Model) setDetailsFull(on bool) tea.Cmd {
 	m.det.full = on
 	m.det.focused = on
-	if on && m.det.hunk < 0 {
-		m.det.selectHunk(0, m.hunkMarks())
+	if on {
+		m.det.focus(m.hunkMarks())
 	}
 	return m.syncDetails(false)
 }
@@ -610,10 +610,7 @@ func (m *Model) handleNavKey(key string) bool {
 		case m.focus == focusFiles:
 			m.focus = focusLanes
 		case m.det.visible && m.target == nil:
-			m.det.focused = true
-			if m.det.hunk < 0 {
-				m.det.selectHunk(0, m.hunkMarks())
-			}
+			m.det.focus(m.hunkMarks())
 		default:
 			m.focus = focusFiles
 		}
@@ -753,6 +750,9 @@ func (m *Model) confirmTarget(e entity) tea.Cmd {
 func (m *Model) handleDetailsKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	d := &m.det
 	marks := m.hunkMarks()
+	if msg.String() == "esc" && d.cancelRange(marks) {
+		return nil, true
+	}
 	switch msg.String() {
 	case "j", "down":
 		d.step(1, marks)
@@ -1051,7 +1051,10 @@ func (m *Model) footer() string {
 		msg += "   " + keyHints(hints...)
 	case m.det.focused || m.det.full:
 		chip = lipgloss.NewStyle().Background(lipgloss.Color("#FB923C")).Foreground(lipgloss.Color("#1C1917")).Bold(true).Padding(0, 1).Render("details")
-		hints := []string{"j/k", "hunk", "J/K", "scroll"}
+		hints := []string{"j/k", "line", "[/]", "hunk", "v", "range", "J/K", "scroll"}
+		if m.det.anchor >= 0 {
+			hints = []string{"j/k", "extend", "v/esc", "cancel range"}
+		}
 		if m.det.ent.kind.uncommitted() {
 			hints = append(hints, "space", "mark", "c", "commit", "r", "amend", "x", "discard")
 		}

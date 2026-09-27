@@ -228,3 +228,25 @@ func TestE2EResolveInEditMode(t *testing.T) {
 	h.wantOnScreen("Unstaged", "changelog", "Start a changelog")
 	h.snap("done")
 }
+
+func TestE2EDiffLineCursor(t *testing.T) {
+	h, _ := newRepoHarness(t)
+	h.selectText("Add users endpoint")
+	h.keys("d", "tab")
+	for range 4 {
+		h.keys("j")
+	}
+	s, ok := h.m.det.lineSelection()
+	if !ok || s.path == "" || s.line == 0 {
+		t.Fatalf("no line under the cursor: %+v", s)
+	}
+	h.wantOnScreen("j/k line")
+	h.snap("cursor")
+
+	h.keys("v", "j", "j")
+	if s, _ := h.m.det.lineSelection(); s.endLine <= s.line {
+		t.Fatalf("range not extended: %+v", s)
+	}
+	h.wantOnScreen("cancel range")
+	h.snap("range")
+}

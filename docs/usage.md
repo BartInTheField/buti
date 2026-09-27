@@ -18,7 +18,10 @@ The `but` CLI has to be on `PATH`, and the repository has to be set up with GitB
 
 - **Unstaged** (left): uncommitted changes as a file tree. Select the header to act on all of them.
 - **Lanes** (right): one per stack, with a card per branch, top of the stack first. Each card lists its commits.
-- **Details** (bottom, `d`): the diff of whatever is selected, syntax highlighted. `D` makes it full screen.
+- **Details** (bottom, `d`): the diff of whatever is selected, syntax highlighted. `D` makes it full screen. With the
+  pane focused (`tab`, or a click), a line cursor (`▶` in the gutter) moves line by line with `j`/`k` or a click, and
+  `[`/`]` jump between hunks; the hunk around the cursor is the one `space`, `c`, `r` and `x` act on. `v` (or
+  shift-click) selects a range of lines within the hunk, marked `┃`; moving the cursor extends it and `esc` cancels it.
 - **Status bar**: the mode, the keys that apply now, and how far the workspace is behind upstream.
 
 buti reloads every 3 seconds. A branch's pull request and its checks come from GitButler's cache, which the reload
