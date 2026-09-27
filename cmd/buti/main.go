@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -41,9 +40,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: buti [-C dir] [--diff] [--remember-selection] [--version] [target]")
 		fmt.Fprintln(stderr, "       buti [-C dir] review <command> ...")
+		fmt.Fprintln(stderr, "       buti [-C dir] skill <command> ...")
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr, "\nReview comments, for coding agents (no TUI):")
-		fmt.Fprintln(stderr, "  "+strings.ReplaceAll(reviewcli.Usage, "\n", "\n  "))
+		fmt.Fprintln(stderr, indentLines(reviewcli.Usage))
+		fmt.Fprintln(stderr, "\nAgent skills, such as /buti-resolve:")
+		fmt.Fprintln(stderr, indentLines(skillUsage))
 	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -61,10 +63,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "buti:", err)
 		return 1
 	}
-	// A branch called review can still be selected on start with `buti -- review`.
+	// A branch called review or skill can still be selected on start with `buti -- review`.
 	rest := fs.Args()
-	if len(rest) > 0 && rest[0] == "review" && !slices.Contains(args[:len(args)-len(rest)], "--") {
-		return runReview(abs, rest[1:], stdout, stderr)
+	if len(rest) > 0 && !slices.Contains(args[:len(args)-len(rest)], "--") {
+		switch rest[0] {
+		case "review":
+			return runReview(abs, rest[1:], stdout, stderr)
+		case "skill":
+			return runSkill(abs, rest[1:], stdout, stderr)
+		}
 	}
 	if _, err := exec.LookPath("but"); err != nil {
 		fmt.Fprintln(stderr, "buti: the GitButler CLI (`but`) must be on PATH")

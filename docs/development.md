@@ -21,7 +21,7 @@ The integration tests and the fixture need the [GitButler CLI](https://docs.gitb
 
 ## Layout
 
-- `cmd/buti`: entrypoint and flags; dispatches `buti review` before the TUI
+- `cmd/buti`: entrypoint and flags; dispatches `buti review` and `buti skill` (`skill.go`) before the TUI
 - `internal/but`: the `but` CLI client
   - reads JSON: status, diff, branch list, oplog
   - runs mutations; each one has a function
@@ -40,6 +40,7 @@ The integration tests and the fixture need the [GitButler CLI](https://docs.gitb
 - `internal/reviewcli`: the `buti review` commands for coding agents, and the flat JSON they print
 - `internal/update`: finding the latest release and replacing the running binary
 - `internal/testrepo`: the test repository (see [Testing](testing.md))
+- `skills`: the agent skills (`buti-resolve/SKILL.md`), embedded in the binary for `buti skill install`
 
 ## CI and releases
 

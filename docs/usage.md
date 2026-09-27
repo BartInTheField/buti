@@ -3,6 +3,7 @@
 ```sh
 buti [-C dir] [--diff] [--remember-selection] [--version] [target]
 buti [-C dir] review <command> ...
+buti [-C dir] skill <command> ...
 ```
 
 | Flag | Does |
@@ -14,8 +15,9 @@ buti [-C dir] review <command> ...
 | `target` | a CLI id or branch name to select on start |
 
 The `but` CLI has to be on `PATH`, and the repository has to be set up with GitButler (`but setup`). `buti review`
-runs the [review commands](#review-comments-for-coding-agents) without starting the TUI; to select a branch called
-`review` on start, run `buti -- review`.
+runs the [review commands](#review-comments-for-coding-agents) and `buti skill` installs the
+[agent skills](#resolving-comments-with-a-coding-agent), both without starting the TUI; to select a branch called
+`review` or `skill` on start, run `buti -- review`.
 
 ## The screen
 
@@ -79,7 +81,7 @@ without a release version (`go run`, `go install`) never check.
 
 ## Review comments
 
-Leave comments on a diff for a coding agent to pick up with `/buti-resolve`:
+Leave comments on a diff for a coding agent to pick up with [`/buti-resolve`](#resolving-comments-with-a-coding-agent):
 
 1. Put the line cursor on a line in the details pane (or select a range with `v`) and press `C`. Write the comment
    (`enter` starts a new line) and save it with `ctrl+s`. Comments go on uncommitted changes, unassigned or assigned,
@@ -155,6 +157,46 @@ buti review clear [--resolved] [--dismissed]
 | `context` | the commented lines, marked `>`, with two lines of the diff around them |
 
 `show --json` adds `author`, `created_at`, `resolution` (`{"summary", "at"}` or `null`) and `replies`.
+
+## Resolving comments with a coding agent
+
+`/buti-resolve` is a skill that has a coding agent fix the open comments: it reads them with
+`buti review list --json`, makes each change, and marks the comment resolved with a one-line summary, which buti then
+shows under the comment. A question gets its answer in the summary, an unclear comment gets a reply and stays open, and
+an outdated one is left for you. For a comment on a commit, the agent fixes the working tree and then asks whether to
+amend the fix into that commit with `but amend`. It never runs git write commands. It ends with a summary per
+shortcode (`zz`, each stack, each commit).
+
+The skill is one agent-agnostic file, [`skills/buti-resolve/SKILL.md`](../skills/buti-resolve/SKILL.md), which any
+agent that can follow a markdown skill and run shell commands can use. buti carries a copy, so it matches the
+`buti review` commands of the version you run:
+
+```sh
+buti skill list                          # the skills buti carries
+buti skill show buti-resolve             # print a SKILL.md
+buti skill install --agent <agent>       # into the agent's skills directory in your home directory
+buti skill install --agent <agent> --project   # into the repository instead, for everyone who works on it
+buti skill install --target <dir>        # into <dir>/buti-resolve, for any other agent
+```
+
+`install` copies every skill unless you name some, and replaces an earlier install, so run it again after updating
+buti. The [skills CLI](https://github.com/vercel-labs/skills) can also install it from the repository:
+`npx skills add BartInTheField/buti`. The agents `--agent` knows:
+
+| `--agent` | Directory (home) | With `--project` | Invoke |
+|---|---|---|---|
+| `claude` (Claude Code) | `~/.claude/skills` | `.claude/skills` | `/buti-resolve`, or ask to resolve the buti comments |
+| `cursor` (Cursor) | `~/.cursor/skills` | `.cursor/skills` | `/buti-resolve` in the agent chat |
+| `codex` (OpenAI Codex) | `~/.agents/skills` | `.agents/skills` | `$buti-resolve`, or pick it from `/skills` |
+| `opencode` (OpenCode) | `~/.config/opencode/skills` | `.opencode/skills` | ask to resolve the buti comments; the agent loads the skill |
+| `copilot` (GitHub Copilot) | `~/.copilot/skills` | `.github/skills` | ask to resolve the buti comments |
+| `agents` (shared Agent Skills) | `~/.agents/skills` | `.agents/skills` | as the agent does |
+
+For an agent that isn't listed, point `--target` at its skills directory. One without skills can take the file as a
+prompt: save it with `buti skill show buti-resolve > buti-resolve.md` and add it to the chat, for example with
+`/read-only buti-resolve.md` in Aider, then ask it to resolve the buti review comments. You can also give an argument:
+a comment id to fix only that one, or a shortcode (`zz`, a commit id) to fix only the comments there, as in
+`/buti-resolve c3`.
 
 ## Not (yet) ported from `but tui`
 
