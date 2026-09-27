@@ -2,17 +2,24 @@
 package main
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/bartinthefield/buti/internal/but"
+	"github.com/bartinthefield/buti/internal/review"
+	"github.com/bartinthefield/buti/internal/reviewcli"
 	"github.com/bartinthefield/buti/internal/ui"
 )
 
@@ -20,31 +27,51 @@ import (
 var version = "dev"
 
 func main() {
-	dir := flag.String("C", ".", "run as if started in `dir`")
-	diff := flag.Bool("diff", false, "show the details pane on start")
-	remember := flag.Bool("remember-selection", false, "restore the selection from the last session")
-	showVersion := flag.Bool("version", false, "print the version and exit")
-	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: buti [-C dir] [--diff] [--remember-selection] [--version] [target]")
-		flag.PrintDefaults()
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+// run runs buti with args and returns the exit code.
+func run(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("buti", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	dir := fs.String("C", ".", "run as if started in `dir`")
+	diff := fs.Bool("diff", false, "show the details pane on start")
+	remember := fs.Bool("remember-selection", false, "restore the selection from the last session")
+	showVersion := fs.Bool("version", false, "print the version and exit")
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "usage: buti [-C dir] [--diff] [--remember-selection] [--version] [target]")
+		fmt.Fprintln(stderr, "       buti [-C dir] review <command> ...")
+		fs.PrintDefaults()
+		fmt.Fprintln(stderr, "\nReview comments, for coding agents (no TUI):")
+		fmt.Fprintln(stderr, "  "+strings.ReplaceAll(reviewcli.Usage, "\n", "\n  "))
 	}
-	flag.Parse()
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
 
 	if *showVersion {
-		fmt.Println("buti", version)
-		return
-	}
-	if _, err := exec.LookPath("but"); err != nil {
-		fmt.Fprintln(os.Stderr, "buti: the GitButler CLI (`but`) must be on PATH")
-		os.Exit(1)
+		fmt.Fprintln(stdout, "buti", version)
+		return 0
 	}
 	abs, err := filepath.Abs(*dir)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "buti:", err)
-		os.Exit(1)
+		fmt.Fprintln(stderr, "buti:", err)
+		return 1
+	}
+	// A branch called review can still be selected on start with `buti -- review`.
+	rest := fs.Args()
+	if len(rest) > 0 && rest[0] == "review" && !slices.Contains(args[:len(args)-len(rest)], "--") {
+		return runReview(abs, rest[1:], stdout, stderr)
+	}
+	if _, err := exec.LookPath("but"); err != nil {
+		fmt.Fprintln(stderr, "buti: the GitButler CLI (`but`) must be on PATH")
+		return 1
 	}
 
-	opts := ui.Options{Target: flag.Arg(0), ShowDetails: *diff, Version: version}
+	opts := ui.Options{Target: fs.Arg(0), ShowDetails: *diff, Version: version}
 	// Builds without a release version (go run, go install) have nothing to update to.
 	if version != "dev" {
 		opts.UpdateCheck = os.Getenv("BUTI_NO_UPDATE_CHECK") == ""
@@ -55,9 +82,26 @@ func main() {
 	}
 	p := tea.NewProgram(ui.New(but.New(abs), opts))
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintln(os.Stderr, "buti:", err)
-		os.Exit(1)
+		fmt.Fprintln(stderr, "buti:", err)
+		return 1
 	}
+	return 0
+}
+
+// runReview runs `buti review`, which needs no terminal, and `but` only for the commands that read the workspace.
+func runReview(dir string, args []string, stdout, stderr io.Writer) int {
+	if reviewcli.NeedsBut(args) {
+		if _, err := exec.LookPath("but"); err != nil {
+			fmt.Fprintln(stderr, "buti review: the GitButler CLI (`but`) must be on PATH")
+			return 1
+		}
+	}
+	return reviewcli.Run(context.Background(), args, reviewcli.Env{
+		Stdout: stdout,
+		Stderr: stderr,
+		Store:  func() (*review.Store, error) { return review.Open(dir) },
+		But:    but.New(dir),
+	})
 }
 
 // updateCache is where the latest release version is remembered between runs.
