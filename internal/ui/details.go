@@ -216,7 +216,8 @@ func (d *details) setNotes(ls []review.Located) {
 }
 
 // notesShown are the comments on what the pane shows: uncommitted comments on an uncommitted diff, a commit's
-// comments on its diff. Orphaned comments have nowhere to go, and resolved ones can be hidden.
+// comments on its diff, and on a branch's diff those of its commits. Orphaned comments have nowhere to go, and
+// resolved ones can be hidden.
 func (d *details) notesShown() []review.Located {
 	var out []review.Located
 	for _, l := range d.notes {
@@ -224,6 +225,15 @@ func (d *details) notesShown() []review.Located {
 		switch {
 		case l.Status == review.StatusOrphaned, d.hideResolved && !isOpen(l):
 			continue
+		case d.ent.kind == entBranch && a.Kind == review.KindCommit && a.Branch == d.ent.branch:
+			// A commit numbers lines as the file is at that commit: show the comment where the branch diff has its
+			// text, and leave out one on lines a later commit changed.
+			if l.Status == review.StatusOutdated {
+				out = append(out, l)
+			} else if moved, ok := review.FindLines(d.fileDiff(a.Path), a); ok {
+				l.Anchor = moved
+				out = append(out, l)
+			}
 		case d.ent.kind.uncommitted() && a.Kind != review.KindCommit,
 			d.ent.kind == entCommit && a.Kind == review.KindCommit && matchesCommit(a, d.ent.commit),
 			d.ent.kind == entCommittedFile && a.Kind == review.KindCommit && matchesCommit(a, d.ent.commit) && a.Path == d.ent.label:
@@ -231,6 +241,19 @@ func (d *details) notesShown() []review.Located {
 		}
 	}
 	return out
+}
+
+// fileDiff is the diff shown of path, or nil.
+func (d *details) fileDiff(path string) *but.FileDiff {
+	if d.data == nil {
+		return nil
+	}
+	for i := range d.data.Changes {
+		if d.data.Changes[i].Path == path {
+			return &d.data.Changes[i]
+		}
+	}
+	return nil
 }
 
 // cursorNote is the comment under the line cursor.

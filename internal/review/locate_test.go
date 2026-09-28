@@ -331,3 +331,31 @@ func TestSaveSkipsConcurrentChange(t *testing.T) {
 		t.Fatalf("overwrote a newer anchor: %+v", got.Anchor)
 	}
 }
+
+// A line of a branch's diff goes on the newest commit that changes it, at that commit's line number; one that is
+// only context goes on a commit that shows it.
+func TestOnBranch(t *testing.T) {
+	f := workspace("c1", tokenV1)
+	b := &f.st.Stacks[0].Branches[0]
+	b.Commits = append([]but.Commit{{CliID: "doc", ChangeID: "change-doc", CommitID: "c2",
+		Changes: []but.Change{{CliID: "d:m", FilePath: "src/auth/token.go"}}}}, b.Commits...)
+	f.diffs["d:m"] = fileDiff("src/auth/token.go", "@@ -1,3 +1,4 @@\n package auth\n \n+// Token returns the token.\n func Token() string { return \"secret\" }\n")
+	ctx := context.Background()
+	on := func(line int, text string) Anchor {
+		a, err := OnBranch(ctx, f.st, f, "auth", Anchor{Path: "src/auth/token.go", Side: SideNew, Line: line, EndLine: line, LineText: text})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return a
+	}
+	if a := on(3, "// Token returns the token."); a.Kind != KindCommit || a.ChangeID != "change-doc" || a.Line != 3 || a.Branch != "auth" {
+		t.Fatalf("doc line on %+v", a)
+	}
+	// Line 4 of the branch diff is line 3 of the commit that added it.
+	if a := on(4, `func Token() string { return "secret" }`); a.ChangeID != "change-token" || a.CommitID != "c1" || a.Line != 3 || a.EndLine != 3 {
+		t.Fatalf("func line on %+v", a)
+	}
+	if _, err := OnBranch(ctx, f.st, f, "auth", Anchor{Path: "src/auth/token.go", Side: SideNew, Line: 9, EndLine: 9, LineText: "nowhere"}); err == nil {
+		t.Fatal("a line no commit has was placed")
+	}
+}

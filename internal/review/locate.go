@@ -326,6 +326,57 @@ func (l *locator) onCommit(c Comment, cm *commitMatch) Located {
 	return found(c, moved, cm.line, cm.commit.CliID, cm.fileID)
 }
 
+// OnBranch turns an anchor on the whole diff of branch into one on the branch's commit that has the lines: the
+// newest one that changes them, else the newest that shows them as context. Comments live on commits, which
+// re-anchoring and agents can find, rather than on a branch diff whose lines shift with every commit.
+func OnBranch(ctx context.Context, st *but.Status, d Differ, branch string, a Anchor) (Anchor, error) {
+	l := &locator{ctx: ctx, st: st, d: d, diffs: map[string]*but.FileDiff{}}
+	var best *commitMatch
+	for si := range st.Stacks {
+		for bi := range st.Stacks[si].Branches {
+			b := &st.Stacks[si].Branches[bi]
+			if b.Name != branch {
+				continue
+			}
+			for ci := range b.Commits {
+				id := changeID(b.Commits[ci].Changes, a.Path)
+				if id == "" {
+					continue
+				}
+				m, err := l.match(id, a)
+				if err != nil {
+					return a, err
+				}
+				if m.line > 0 && (best == nil || m.changed && !best.changed) {
+					best = &commitMatch{commit: &b.Commits[ci], branch: b.Name, fileID: id, match: m}
+					if m.changed {
+						break
+					}
+				}
+			}
+		}
+	}
+	if best == nil {
+		return a, fmt.Errorf("No single commit on %s has these lines; comment on the commit instead", branch)
+	}
+	return l.onCommit(Comment{Anchor: a}, best).Anchor, nil
+}
+
+// FindLines finds an anchor's text in a file diff, as re-anchoring does: at its line, else at the nearest line
+// that has it. It returns the anchor moved there, and false when the diff does not have the text.
+func FindLines(fd *but.FileDiff, a Anchor) (Anchor, bool) {
+	if fd == nil {
+		return a, false
+	}
+	m := findLines(sideLines(fd, a.Side), a)
+	if m.line == 0 {
+		return a, false
+	}
+	a.EndLine = m.line + (a.EndLine - a.Line)
+	a.Line = m.line
+	return a, true
+}
+
 // commitsWith lists the applied commits that change path, newest first, with the stack at index home first.
 func (l *locator) commitsWith(path string, home int) []commitMatch {
 	order := make([]int, 0, len(l.st.Stacks))

@@ -124,16 +124,38 @@ func TestCommentOnCommitRange(t *testing.T) {
 	}
 }
 
-// Comments go on uncommitted changes or commits; a branch diff has no stable place for them.
-func TestNoCommentOnBranch(t *testing.T) {
+// C on a branch's diff puts the comment on the branch's commit that has the line; it shows in the branch diff and
+// in the commit's.
+func TestCommentOnBranch(t *testing.T) {
 	h := newHarness(t)
 	h.but.setDiff(fileDiff("c1:x", "x.go", "@@ -1,1 +1,2 @@\n package x\n+func A() {}\n"))
 	h.selectText("branch-4")
-	h.keys("D", "j", "C")
-	if len(h.comments()) != 0 || h.m.modal != nil {
-		t.Fatal("C on a branch diff opened the composer")
+	h.keys("D", "j", "j", "C")
+	h.wantScreen("on x.go line 2 in abcdef1")
+	h.typeText("Name it")
+	h.keys("ctrl+s")
+
+	a := h.onlyComment().Anchor
+	want := review.Anchor{Kind: review.KindCommit, ChangeID: "chg1", CommitID: "abcdef123", Branch: "branch-4",
+		Path: "x.go", Side: review.SideNew, Line: 2, EndLine: 2, LineText: "func A() {}"}
+	if a != want {
+		t.Fatalf("anchor %+v\nwant   %+v", a, want)
 	}
-	h.wantScreen("Comment on a commit or on uncommitted")
+	h.wantScreen("you · line 2", "Name it")
+	h.keys("esc")
+	h.wantScreen("✎1 abcdef1")
+}
+
+// A line no commit of the branch has, such as one of a file no commit changes, gets no comment.
+func TestCommentOnBranchNoCommit(t *testing.T) {
+	h := newHarness(t)
+	h.but.setDiff(fileDiff("b4:y", "y.go", "@@ -1,1 +1,2 @@\n package y\n+func A() {}\n"))
+	h.selectText("branch-4")
+	h.keys("D", "j", "j", "C")
+	if len(h.comments()) != 0 || h.m.modal != nil {
+		t.Fatal("C opened the composer on lines no commit has")
+	}
+	h.wantScreen("No single commit on branch-4")
 }
 
 // Seeds a comment on go.mod line 2 and opens its diff with the cursor on it.
