@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -356,4 +357,65 @@ func TestE2EAgentReview(t *testing.T) {
 	h.keys("enter")
 	h.wantOnScreen("README.md line 7  [suggestion]", "agent · zz", "src/auth/token.go line 3  [must-fix]")
 	h.snap("palette")
+}
+
+// A comment left in a branch's diff goes on the branch's commit that changes the line, and `buti review list` gives
+// that commit's shortcode.
+func TestE2EBranchComment(t *testing.T) {
+	h, r := newRepoHarness(t)
+	h.hover("branch:api")
+	h.keys("d")
+	h.click(`"/health", "/users"`)
+	h.keys("C")
+	h.typeText("Keep the routes sorted")
+	h.wantOnScreen("on src/api/routes.go line 3 in")
+	h.snap("composer")
+	h.keys("ctrl+s")
+	h.wantOnScreen("you · line 3", "Keep the routes sorted")
+	h.snap("branch")
+
+	// Context in the newest commit, added by the one before it.
+	h.click("package api")
+	h.keys("C")
+	h.typeText("Name the package routes?")
+	h.keys("ctrl+s")
+	h.wantOnScreen("you · line 1", "Name the package routes?")
+
+	cs, err := h.m.review.List()
+	if err != nil || len(cs) != 2 {
+		t.Fatalf("comments %+v, %v", cs, err)
+	}
+	commits := map[string]string{} // subject -> cli id
+	for _, s := range h.status().Stacks {
+		for _, b := range s.Branches {
+			for _, c := range b.Commits {
+				commits[c.Subject()] = c.CliID
+			}
+		}
+	}
+	var out, errOut strings.Builder
+	if code := reviewcli.Run(context.Background(), []string{"list", "--json"}, reviewcli.Env{
+		Stdout: &out, Stderr: &errOut, But: but.New(r.Dir),
+		Store: func() (*review.Store, error) { return review.Open(r.Dir) },
+	}); code != 0 {
+		t.Fatalf("buti review list: exit %d\n%s", code, errOut.String())
+	}
+	var listed []struct {
+		Shortcode string `json:"shortcode"`
+		Kind      string `json:"kind"`
+		Branch    string `json:"branch"`
+		Body      string `json:"body"`
+	}
+	if err := json.Unmarshal([]byte(out.String()), &listed); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	want := map[string]string{"Keep the routes sorted": commits["Add users endpoint"], "Name the package routes?": commits["Add API routes"]}
+	for _, l := range listed {
+		if l.Kind != "commit" || l.Branch != "api" || l.Shortcode != want[l.Body] {
+			t.Errorf("listed %+v, want shortcode %s", l, want[l.Body])
+		}
+	}
+
+	h.selectText("Add API routes")
+	h.wantOnScreen("you · line 1", "Name the package routes?", "✎1")
 }

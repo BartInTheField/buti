@@ -193,8 +193,10 @@ func (m *Model) anchorFor(e entity, s lineSel) (review.Anchor, error) {
 				a.Kind, a.Branch = review.KindAssigned, st.Branches[0].Name
 			}
 		}
+	case e.kind == entBranch:
+		a.Branch = e.branch // no kind yet: saving puts it on the branch's commit that has the lines
 	default:
-		return a, errors.New("Comment on a commit or on uncommitted changes, not a branch")
+		return a, errors.New("Comment on a diff: uncommitted changes, a commit or a branch")
 	}
 	return a, nil
 }
@@ -229,7 +231,45 @@ func (m *Model) startComment([]entity) tea.Cmd {
 	if err != nil {
 		return m.notify(toastInfo, err.Error())
 	}
-	m.openModal(newCommentComposer("on "+where(a), "", func(m *Model, body string) tea.Cmd {
+	if a.Kind != "" {
+		m.composeComment(a, "on "+where(a))
+		return nil
+	}
+	// On a branch: find the commit first (a `but diff` per commit), so the composer can say where the comment goes.
+	st, client := m.status, m.client
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
+		defer cancel()
+		on, err := review.OnBranch(ctx, st, client, a.Branch, a)
+		return branchAnchorMsg{shown: a, anchor: on, err: err}
+	}
+}
+
+// branchAnchorMsg delivers the commit anchor of a comment started on a branch's diff.
+type branchAnchorMsg struct {
+	shown  review.Anchor // the lines as the branch diff numbers them
+	anchor review.Anchor
+	err    error
+}
+
+func (m *Model) receiveBranchAnchor(msg branchAnchorMsg) tea.Cmd {
+	if msg.err != nil {
+		return m.notify(toastInfo, msg.err.Error())
+	}
+	if m.modal != nil || m.det.ent.kind != entBranch || m.det.ent.branch != msg.shown.Branch {
+		return nil // the user moved on
+	}
+	in := ""
+	if id := msg.anchor.CommitID; len(id) >= 7 {
+		in = " in " + id[:7]
+	}
+	m.composeComment(msg.anchor, "on "+where(msg.shown)+in)
+	return nil
+}
+
+// composeComment asks for the text of a new comment on a.
+func (m *Model) composeComment(a review.Anchor, what string) {
+	m.openModal(newCommentComposer(what, "", func(m *Model, body string) tea.Cmd {
 		if strings.TrimSpace(body) == "" {
 			return nil
 		}
@@ -240,7 +280,6 @@ func (m *Model) startComment([]entity) tea.Cmd {
 			return reviewDoneMsg{text: "Comment added on " + where(a), reveal: c.ID, err: err}
 		}
 	}))
-	return nil
 }
 
 func (m *Model) editComment([]entity) tea.Cmd {

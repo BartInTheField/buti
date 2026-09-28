@@ -86,7 +86,8 @@ or read the ones an agent left with [`/buti-review`](#reviewing-with-a-coding-ag
 
 1. Put the line cursor on a line in the details pane (or select a range with `v`) and press `C`. Write the comment
    (`enter` starts a new line) and save it with `ctrl+s`. Comments go on uncommitted changes, unassigned or assigned,
-   and on commits; a branch's diff has no stable place for them.
+   and on commits. In a branch's diff, a comment goes on the branch's commit that has the lines (the newest that
+   changes them), which the composer names; it shows in the branch's diff and in the commit's.
 2. The comment shows in a box under its last line, headed by who wrote it: `you`, or `agent` (in teal) for one a
    coding agent left. A leading severity tag (`[must-fix]`, `[suggestion]`, `[nit]`, `[question]`) is coloured, and
    replies show as `↳ author: text`. Files in **Unstaged** and in the lanes, and commits, show how many

@@ -182,6 +182,9 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 	case reviewDoneMsg:
 		return m.handleReviewDone(msg)
 
+	case branchAnchorMsg:
+		return m.receiveBranchAnchor(msg)
+
 	case detailsMsg:
 		m.det.receive(msg, m.hunkMarks())
 		return nil
