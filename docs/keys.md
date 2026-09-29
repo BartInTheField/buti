@@ -21,7 +21,8 @@
 | `space` | mark (on **Unstaged**, marks every file) |
 | `f` / `F` | files in the commit / in every commit |
 | `d` / `D` / `+` `-` | details pane / full screen / resize |
-| `tab` | cycle focus: sidebar → lanes → details. In details: `j`/`k` move the line cursor (click a line to put it there), `J`/`K` scroll, `space` marks the cursor's hunk, then `c` / `r` / `x` on hunks |
+| `T` | in full-screen details: show / hide the file tree |
+| `tab` | cycle focus: sidebar → lanes → details. In details: `j`/`k` move the line cursor (click a line to put it there), `J`/`K` scroll, `space` marks the cursor's hunk, then `c` / `r` / `x` on hunks. In full-screen details: `tab` (or `h` / `l`) moves between the file tree and the diff; in the tree `j`/`k` jump the diff to a file and `enter` folds a folder |
 | `[` / `]` | in details: previous / next hunk |
 | `v` | in details: select a range of lines from the cursor (or shift-click); moving extends it, `v` or `esc` cancels |
 | `C` | in details: comment on the cursor's line or range (`ctrl+s` saves, `enter` is a new line) |

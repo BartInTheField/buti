@@ -128,15 +128,22 @@ func (r fileRow) render(width int, selected bool, d rowDeco) string {
 		if d.marked {
 			arrow = markGlyph
 		}
-		line := ansi.Truncate(indent+arrow+" "+r.name+"/", width, "…")
+		name := r.name + "/"
+		if d.active {
+			name = titleStyle.Render(name)
+		}
+		line := ansi.Truncate(indent+arrow+" "+name, width, "…")
 		return dimmed(pad(line, width, selected), d)
 	}
 	letter, st := changeTypeStyle(r.change.ChangeType)
-	lead := "  "
+	lead, name := "  ", r.name
 	if d.marked {
 		lead = markGlyph + " "
 	}
-	return dimmed(fileLine(indent+lead, r.name, withCount(st.Render(letter), d.comments), width, selected), d)
+	if d.active {
+		name = titleStyle.Render(name)
+	}
+	return dimmed(fileLine(indent+lead, name, withCount(st.Render(letter), d.comments), width, selected), d)
 }
 
 // fileLine renders "<prefix><name> … <tag>" with the tag flush right.

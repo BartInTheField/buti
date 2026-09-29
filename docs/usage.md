@@ -27,6 +27,9 @@ runs the [review commands](#review-comments-for-coding-agents) and `buti skill` 
   pane focused (`tab`, or a click), a line cursor (`▶` in the gutter) moves line by line with `j`/`k` or a click, and
   `[`/`]` jump between hunks; the hunk around the cursor is the one `space`, `c`, `r` and `x` act on. `v` (or
   shift-click) selects a range of lines within the hunk, marked `┃`; moving the cursor extends it and `esc` cancels it.
+  Full screen, a **Files** tree on the left lists the files in the diff, with the one the diff is at highlighted:
+  `tab` (or `h`) moves into it, `j`/`k` (or a click) jump the diff to a file, `enter` folds a folder or goes back
+  to the diff, and `T` hides the tree. It is left out on screens narrower than 90 columns.
 - **Status bar**: the mode, the keys that apply now, and how far the workspace is behind upstream.
 
 buti reloads every 3 seconds. A branch's pull request and its checks come from GitButler's cache, which the reload

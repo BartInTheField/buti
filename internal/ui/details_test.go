@@ -93,8 +93,8 @@ func TestStepScrollsThroughTallHunk(t *testing.T) {
 		h.keys("J")
 	}
 	rows := strings.Split(h.screen(), "\n")
-	for _, r := range rows[len(rows)-1-detailsTail : len(rows)-1] { // above the footer
-		if strings.TrimSpace(r) != "" {
+	for _, r := range rows[len(rows)-1-detailsTail : len(rows)-1] { // above the footer, next to the file tree
+		if strings.Trim(r, " │") != "" {
 			t.Fatalf("no blank space below the end of the diff:\n%s", h.screen())
 		}
 	}
@@ -226,5 +226,66 @@ func TestClickLine(t *testing.T) {
 	h.send(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft, Mod: tea.ModShift})
 	if s := h.lineSel(); s.path != "a.go" || s.line != 3 || s.endLine != 5 {
 		t.Fatalf("shift-click range: %+v", s)
+	}
+}
+
+// treeDiff is a diff of files in two directories, for the file tree.
+func treeDiff() *but.Diff {
+	d := testDiff(3, 1)
+	for i, p := range []string{"pkg/a.go", "pkg/b.go", "main.go"} {
+		d.Changes[i].Path = p
+	}
+	return d
+}
+
+// Full screen, the details pane lists its files in a tree, and moving through it jumps the diff.
+func TestFullDetailsFileTree(t *testing.T) {
+	h := newHarness(t)
+	h.but.setDiff(treeDiff())
+	h.selectText("Unstaged")
+	h.keys("D")
+	for _, want := range []string{"Files", "pkg/", "a.go", "b.go", "main.go"} {
+		if !strings.Contains(h.screen(), want) {
+			t.Fatalf("%q not on the full screen:\n%s", want, h.screen())
+		}
+	}
+	if got := h.m.det.activeFile(); got != "pkg/a.go" {
+		t.Fatalf("active file %q, want pkg/a.go", got)
+	}
+
+	h.keys("tab") // the tree takes focus, on the active file
+	if !h.m.det.tree.focused || h.m.det.tree.cursor != 1 {
+		t.Fatalf("tab should focus the tree on pkg/a.go: focused=%v cursor=%d", h.m.det.tree.focused, h.m.det.tree.cursor)
+	}
+	h.keys("j")
+	if got := h.m.det.activeFile(); got != "pkg/b.go" || h.m.det.hunk != 1 {
+		t.Fatalf("j should jump to pkg/b.go: active %q, hunk %d", got, h.m.det.hunk)
+	}
+	h.keys("G", "enter") // main.go, and back to the diff
+	if got := h.m.det.activeFile(); got != "main.go" || h.m.det.tree.focused {
+		t.Fatalf("enter should jump to main.go and leave the tree: active %q, focused %v", got, h.m.det.tree.focused)
+	}
+
+	h.keys("tab", "g", "enter") // fold pkg/
+	if len(h.m.det.tree.rows) != 2 || !strings.Contains(h.screen(), "▸ pkg/") {
+		t.Fatalf("enter on a directory should fold it:\n%s", h.screen())
+	}
+	h.click("main.go")
+	if got := h.m.det.activeFile(); got != "main.go" {
+		t.Fatalf("clicking a file should jump to it: active %q", got)
+	}
+
+	h.keys("T")
+	if strings.Contains(h.screen(), "Files") {
+		t.Fatal("T should hide the tree")
+	}
+	h.keys("T")
+	h.send(tea.WindowSizeMsg{Width: 80, Height: 36})
+	if strings.Contains(h.screen(), "Files") {
+		t.Fatal("a narrow screen should hide the tree")
+	}
+	h.keys("esc")
+	if h.m.det.full {
+		t.Fatal("esc should leave full screen")
 	}
 }

@@ -81,7 +81,15 @@ func (r diffRow) isNote() bool { return r.note != "" && r.top }
 type diffLayout struct {
 	rows  []diffRow
 	hunks []hunkRef
+	files []fileRef
 	numW  int // width of a line number in the gutter
+}
+
+// fileRef locates a file's header inside a laid out diff.
+type fileRef struct {
+	path string
+	row  int // the file header's row
+	hunk int // the file's first hunk, -1 without a text diff
 }
 
 // renderDiff draws a syntax highlighted unified diff at the given width.
@@ -111,6 +119,7 @@ func layoutDiff(d *but.Diff, width int) diffLayout {
 			if prevPath != "" {
 				plain("")
 			}
+			l.files = append(l.files, fileRef{path: f.Path, row: len(l.rows), hunk: -1})
 			letter, st := changeTypeStyle(f.Status)
 			header := " " + st.Inherit(fileHeaderStyle).Render(letter) + fileHeaderStyle.Render(" "+f.Path)
 			plain(fileHeaderStyle.Width(width).Render(ansi.Truncate(header, width, "…")))
@@ -128,6 +137,9 @@ func layoutDiff(d *but.Diff, width int) diffLayout {
 			}
 			ref := hunkRef{line: len(l.rows), id: id, path: f.Path, text: h.Diff}
 			idx := len(l.hunks)
+			if last := &l.files[len(l.files)-1]; last.hunk < 0 {
+				last.hunk = idx
+			}
 			header, lines := parseHunk(f.Path, h)
 			l.rows = append(l.rows, diffRow{hunk: idx, header: true, text: ansi.Truncate(header, max(width-2, 1), "…")})
 			for _, dl := range lines {

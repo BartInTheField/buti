@@ -544,6 +544,7 @@ func (m *Model) syncDetails(force bool) tea.Cmd {
 func (m *Model) setDetailsFull(on bool) tea.Cmd {
 	m.det.full = on
 	m.det.focused = on
+	m.det.tree.focused = false
 	if on {
 		m.det.focus(m.hunkMarks())
 	}
@@ -778,6 +779,11 @@ func (m *Model) handleDetailsKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	if a, ok := m.actionFor(msg.String(), m.subjects()); ok && a.group == "Review" {
 		return a.run(m, m.subjects()), true
 	}
+	if d.treeShown() && d.tree.focused {
+		if cmd, handled := m.handleTreeKey(msg); handled {
+			return cmd, true
+		}
+	}
 	switch msg.String() {
 	case "j", "down":
 		d.step(1, marks)
@@ -801,7 +807,11 @@ func (m *Model) handleDetailsKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		d.selectHunk(len(d.doc.hunks)-1, marks)
 		d.vp.GotoBottom()
 	case "esc", "h", "left", "tab":
-		if d.full && msg.String() != "esc" && msg.String() != "tab" {
+		switch {
+		case d.full && msg.String() != "esc" && d.treeShown():
+			d.tree.focus(d.activeFile())
+			return nil, true
+		case d.full && msg.String() != "esc" && msg.String() != "tab":
 			return nil, true
 		}
 		d.focused, d.full = false, false
@@ -823,6 +833,38 @@ func (m *Model) handleDetailsKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		return nil, false
 	default:
 		return nil, false
+	}
+	return nil, true
+}
+
+// handleTreeKey handles keys while the file tree next to the full-screen diff has focus: moving to a file
+// jumps the diff to it.
+func (m *Model) handleTreeKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
+	d, t := &m.det, &m.det.tree
+	switch msg.String() {
+	case "j", "down":
+		t.move(1)
+	case "k", "up":
+		t.move(-1)
+	case "g", "home":
+		t.move(-1 << 20)
+	case "G", "end":
+		t.move(1 << 20)
+	case "enter":
+		if t.toggle(d.data) {
+			return nil, true
+		}
+		t.focused = false
+	case "l", "right", "tab":
+		t.focused = false
+		return nil, true
+	case "h", "left":
+		return nil, true
+	default:
+		return nil, false
+	}
+	if path, ok := t.file(); ok {
+		d.jumpToFile(path, m.hunkMarks())
 	}
 	return nil, true
 }
@@ -1085,6 +1127,8 @@ func (m *Model) footer() string {
 		}
 		l, onNote := m.det.cursorNote()
 		switch {
+		case m.det.treeShown() && m.det.tree.focused:
+			hints = []string{"j/k", "file", "enter", "open / fold", "tab", "diff", "T", "hide tree"}
 		case onNote:
 			resolve := "resolve"
 			if !isOpen(l) {
@@ -1093,6 +1137,9 @@ func (m *Model) footer() string {
 			hints = []string{"j/k", "line", "e", "edit", "d", "delete", "x", resolve, "z", onOff("hide resolved", m.det.hideResolved)}
 		case m.det.ent.kind.uncommitted():
 			hints = append(hints, "space", "mark", "c", "commit", "r", "amend", "x", "discard")
+		}
+		if m.det.treeShown() && !m.det.tree.focused {
+			hints = append(hints, "tab", "files")
 		}
 		msg = keyHints(append(hints, "y", "copy", "D", "full", "esc", "back")...)
 	default:

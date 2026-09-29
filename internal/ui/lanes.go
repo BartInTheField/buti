@@ -53,6 +53,7 @@ type rowDeco struct {
 	tag      string // operation label on a hovered target, e.g. "amend"
 	insert   int    // -1/+1: draw an insertion marker above/below the row
 	comments int    // open review comments on it, for a badge
+	active   bool   // the file the full-screen diff is at, in its file tree
 }
 
 type decoFunc func(entity) rowDeco
