@@ -825,6 +825,15 @@ func (m *Model) handleDetailsKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		d.rerender(marks)
 	case "D":
 		return m.setDetailsFull(!d.full), true
+	case "+", "=", "-":
+		if !d.treeShown() {
+			return nil, false // the split pane's height
+		}
+		if msg.String() == "-" {
+			d.resizeTree(-4)
+		} else {
+			d.resizeTree(4)
+		}
 	case "q":
 		if d.full {
 			d.full, d.focused = false, false

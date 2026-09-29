@@ -390,7 +390,19 @@ func (d *details) treeShown() bool {
 	return d.full && !d.tree.hidden && d.outerW >= treeMinWidth
 }
 
-func (d *details) treeWidth() int { return clamp(d.outerW/4, 24, 40) }
+// treeWidth is the tree's width: the default share of the pane, or the width it was resized to.
+func (d *details) treeWidth() int {
+	if d.tree.width > 0 {
+		return d.clampTreeWidth(d.tree.width)
+	}
+	return clamp(d.outerW/4, 24, 40)
+}
+
+// clampTreeWidth keeps a tree width readable and leaves the diff room.
+func (d *details) clampTreeWidth(w int) int { return clamp(w, 12, max(d.outerW-40, 12)) }
+
+// resizeTree widens (or narrows) the tree by dw.
+func (d *details) resizeTree(dw int) { d.tree.width = d.clampTreeWidth(d.treeWidth() + dw) }
 
 // activeFile is the file the pane is at: the line cursor's while it is on screen, else the one at the top.
 func (d *details) activeFile() string {
@@ -725,8 +737,14 @@ func (d *details) view(width, height int) string {
 	}
 	body := lipgloss.NewStyle().PaddingLeft(1).Render(d.vp.View())
 	if tree {
-		vdiv := dividerStyle.Render(strings.TrimSuffix(strings.Repeat("│\n", height-1), "\n"))
-		body = lipgloss.JoinHorizontal(lipgloss.Top, d.tree.render(d.treeWidth(), height-1, d.activeFile()), vdiv, body)
+		tw, divStyle := d.treeWidth(), dividerStyle
+		if d.tree.dragW > 0 {
+			// The divider follows the pointer; the diff is laid out at its new width once it is dropped.
+			tw, divStyle = d.clampTreeWidth(d.tree.dragW), titleStyle
+			body = lipgloss.NewStyle().MaxWidth(max(width-tw-1, 1)).Render(body)
+		}
+		vdiv := divStyle.Render(strings.TrimSuffix(strings.Repeat("│\n", height-1), "\n"))
+		body = lipgloss.JoinHorizontal(lipgloss.Top, d.tree.render(tw, height-1, d.activeFile()), vdiv, body)
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, bar, body)
 }

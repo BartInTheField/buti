@@ -34,6 +34,7 @@ const (
 	hitMore        // a branch card's ⋯ menu
 	hitDetails
 	hitDetailsTree // a row of the file tree next to the full-screen diff
+	hitTreeSplit   // the divider between that tree and the diff
 	hitDetailsClose
 	hitButton // an edit mode button; key is its action's
 )
@@ -69,6 +70,8 @@ func (m *Model) hitTest(x, y int) hit {
 			return hit{kind: hitDetailsClose}
 		case y > 0 && m.det.treeShown() && x < m.det.treeWidth():
 			return hit{kind: hitDetailsTree, row: m.det.tree.offset + y - 3} // below the title bar, header and rule
+		case y > 0 && m.det.treeShown() && x == m.det.treeWidth():
+			return hit{kind: hitTreeSplit}
 		}
 		return hit{kind: hitDetails, line: y - 1}
 	}
@@ -145,6 +148,10 @@ func (m *Model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 	case tea.MouseClickMsg:
 		return m.handleClick(msg)
 	case tea.MouseMotionMsg:
+		if m.det.tree.dragW > 0 {
+			m.det.tree.dragW = max(msg.X, 1)
+			return nil
+		}
 		if m.press != nil {
 			if m.drag == nil {
 				srcs := []entity{m.press.ent}
@@ -159,6 +166,10 @@ func (m *Model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 		}
 	case tea.MouseReleaseMsg:
 		defer func() { m.press, m.drag = nil, nil }()
+		if t := &m.det.tree; t.dragW > 0 {
+			t.width, t.dragW = m.det.clampTreeWidth(t.dragW), 0
+			return nil
+		}
 		if m.drag != nil && m.drag.moved {
 			return m.drop(msg.X, msg.Y)
 		}
@@ -203,6 +214,9 @@ func (m *Model) handleClick(msg tea.MouseClickMsg) tea.Cmd {
 		if h.line >= 0 {
 			m.det.clickLine(h.line, msg.Mod&tea.ModShift != 0, marks)
 		}
+		return nil
+	case hitTreeSplit:
+		m.det.tree.dragW = max(msg.X, 1)
 		return nil
 	case hitDetailsTree:
 		t := &m.det.tree

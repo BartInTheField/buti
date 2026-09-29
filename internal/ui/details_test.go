@@ -275,6 +275,22 @@ func TestFullDetailsFileTree(t *testing.T) {
 		t.Fatalf("clicking a file should jump to it: active %q", got)
 	}
 
+	before := h.m.det.treeWidth()
+	h.keys("-")
+	if h.m.det.treeWidth() != before-4 || h.m.det.width != 139-(before-4)-1 { // the pane is a column narrower than the screen
+		t.Fatalf("- should narrow the tree by 4: tree %d, diff %d", h.m.det.treeWidth(), h.m.det.width)
+	}
+	x, y := h.find("│")
+	h.send(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	h.send(tea.MouseMotionMsg{X: 50, Y: y, Button: tea.MouseLeft})
+	if h.m.det.treeWidth() != before-4 {
+		t.Fatal("the diff should not be re-laid out while the divider is dragged")
+	}
+	h.send(tea.MouseReleaseMsg{X: 50, Y: y, Button: tea.MouseLeft})
+	if h.m.det.treeWidth() != 50 || h.m.det.width != 139-50-1 {
+		t.Fatalf("dragging the divider to column 50 gave tree %d, diff %d", h.m.det.treeWidth(), h.m.det.width)
+	}
+
 	h.keys("T")
 	if strings.Contains(h.screen(), "Files") {
 		t.Fatal("T should hide the tree")

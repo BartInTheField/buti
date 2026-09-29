@@ -19,6 +19,8 @@ type fileTree struct {
 	cursor    int
 	offset    int
 	height    int // rows that fit
+	width     int // set by dragging the divider or +/-; 0 for the default
+	dragW     int // where the divider is being dragged to; 0 when it is not
 	focused   bool
 	hidden    bool // switched off with T
 }

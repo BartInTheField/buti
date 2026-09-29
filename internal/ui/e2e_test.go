@@ -442,6 +442,8 @@ func TestE2EFullDetailsTree(t *testing.T) {
 	}
 	h.wantOnScreen("func Reverse")
 	h.snap("folded")
+	h.keys("-", "-", "-")
+	h.snap("narrow-tree")
 
 	h.keys("esc")
 	h.selectText("Add users endpoint")
