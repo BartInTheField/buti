@@ -419,3 +419,51 @@ func TestE2EBranchComment(t *testing.T) {
 	h.selectText("Add API routes")
 	h.wantOnScreen("you · line 1", "Name the package routes?", "✎1")
 }
+
+func TestE2EFullDetailsTree(t *testing.T) {
+	h, _ := newRepoHarness(t)
+	h.selectText("Unstaged")
+	h.keys("D")
+	h.wantOnScreen("Files", "docs/", "old.md", "src/", "util/", "strings.go", "server.go", "README.md")
+	h.snap("uncommitted")
+
+	h.keys("tab", "G") // README.md, the last row
+	h.wantOnScreen("# demo")
+	if got := h.m.det.activeFile(); got != "README.md" {
+		t.Fatalf("active file %q, want README.md", got)
+	}
+	h.keys("g", "enter") // fold docs/
+	if rows := h.m.det.tree.rows; len(rows) == 0 || !rows[0].collapsed {
+		t.Fatalf("docs/ should be folded:\n%s", h.screen())
+	}
+	h.keys("j", "j", "j") // src/, util/, strings.go
+	if got := h.m.det.activeFile(); got != "src/util/strings.go" {
+		t.Fatalf("active file %q, want src/util/strings.go", got)
+	}
+	h.wantOnScreen("func Reverse")
+	h.snap("folded")
+	h.keys("-", "-", "-")
+	h.snap("narrow-tree")
+
+	h.keys("esc")
+	h.selectText("Add users endpoint")
+	h.keys("D")
+	h.wantOnScreen("src/api/", "routes.go", "users.go", "2 files changed")
+	h.snap("commit")
+}
+
+func TestE2ESidebarResize(t *testing.T) {
+	h, _ := newRepoHarness(t)
+	h.selectText("README.md")
+	h.keys("d")
+	x := h.m.sidebarWidth()
+	h.send(tea.MouseClickMsg{X: x, Y: 5, Button: tea.MouseLeft})
+	h.send(tea.MouseMotionMsg{X: 24, Y: 5, Button: tea.MouseLeft})
+	h.snap("dragging")
+	h.send(tea.MouseReleaseMsg{X: 24, Y: 5, Button: tea.MouseLeft})
+	if h.m.sidebarWidth() != 24 {
+		t.Fatalf("sidebar width %d, want 24", h.m.sidebarWidth())
+	}
+	h.wantOnScreen("Unstaged", "README.md", "## Usage")
+	h.snap("narrow")
+}

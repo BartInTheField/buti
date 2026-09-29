@@ -46,7 +46,9 @@ type details struct {
 	cursor  int      // layout row of the line cursor, inside the selected hunk; -1 for none
 	anchor  int      // layout row where the range selection started; -1 for none
 	vp      viewport.Model
-	width   int
+	width   int // of the diff
+	outerW  int // of the pane, tree included
+	tree    fileTree
 
 	// Review comments: every located comment, of which the pane draws those on what it shows.
 	notes        []review.Located
@@ -104,6 +106,7 @@ func (d *details) sync(c *but.Client, e entity, force bool) tea.Cmd {
 	id, prefix, ok := diffTarget(e)
 	if !ok {
 		d.data, d.err, d.loading = nil, nil, false
+		d.tree.build(nil)
 		d.rerender()
 		return nil
 	}
@@ -128,6 +131,7 @@ func (d *details) receive(msg detailsMsg, marks map[string]bool) {
 		return
 	}
 	d.loading, d.data, d.err = false, msg.diff, msg.err
+	d.tree.build(d.data)
 	if d.hunk >= 0 && d.data != nil && d.hunk >= countHunks(d.data) {
 		d.hunk = countHunks(d.data) - 1
 	}
@@ -365,13 +369,70 @@ func (d *details) redraw(marks map[string]bool) {
 	d.drawn, d.marks = sel, marks
 }
 
+// setSize sizes the pane; full screen, the file tree takes its share of the width.
 func (d *details) setSize(w, h int) {
+	d.outerW = w
+	if d.treeShown() {
+		w -= d.treeWidth() + 1
+	}
 	if w != d.width {
 		d.width = w
 		d.rerender()
 	}
 	d.vp.SetWidth(w)
 	d.vp.SetHeight(max(h, 1))
+	d.tree.height = h - 2 // its header and rule
+	d.tree.clamp()
+}
+
+// treeShown reports whether the file tree is drawn: full screen, unless hidden or the screen is narrow.
+func (d *details) treeShown() bool {
+	return d.full && !d.tree.hidden && d.outerW >= treeMinWidth
+}
+
+// treeWidth is the tree's width: the default share of the pane, or the width it was resized to.
+func (d *details) treeWidth() int {
+	if d.tree.width > 0 {
+		return d.clampTreeWidth(d.tree.width)
+	}
+	return clamp(d.outerW/4, 24, 40)
+}
+
+// clampTreeWidth keeps a tree width readable and leaves the diff room.
+func (d *details) clampTreeWidth(w int) int { return clamp(w, 12, max(d.outerW-40, 12)) }
+
+// resizeTree widens (or narrows) the tree by dw.
+func (d *details) resizeTree(dw int) { d.tree.width = d.clampTreeWidth(d.treeWidth() + dw) }
+
+// activeFile is the file the pane is at: the line cursor's while it is on screen, else the one at the top.
+func (d *details) activeFile() string {
+	rows := d.layout.rows
+	if d.focused && d.cursor >= 0 && d.cursor < len(rows) && rows[d.cursor].hunk >= 0 {
+		if y := len(d.header) + d.cursor; y >= d.vp.YOffset() && y < d.vp.YOffset()+d.vp.Height() {
+			return d.layout.hunks[rows[d.cursor].hunk].path
+		}
+	}
+	top, path := d.vp.YOffset()-len(d.header), ""
+	for i, f := range d.layout.files {
+		if i == 0 || f.row <= top {
+			path = f.path
+		}
+	}
+	return path
+}
+
+// jumpToFile scrolls the diff to a file's header, with the line cursor on its first hunk.
+func (d *details) jumpToFile(path string, marks map[string]bool) {
+	for _, f := range d.layout.files {
+		if f.path != path {
+			continue
+		}
+		if f.hunk >= 0 {
+			d.selectHunk(f.hunk, marks)
+		}
+		d.vp.SetYOffset(len(d.header) + f.row)
+		return
+	}
 }
 
 // focus gives the pane focus, selecting the first hunk when none is.
@@ -665,13 +726,25 @@ func (d *details) view(width, height int) string {
 	if d.loading {
 		title += " …"
 	}
+	tree := d.treeShown()
 	style := headerStyle
-	if d.focused || d.full {
+	if (d.focused || d.full) && (!tree || !d.tree.focused) {
 		style = titleStyle
 	}
 	bar := style.Render(" " + ansi.Truncate(title, max(width-12, 1), "…"))
 	if d.full {
 		bar += strings.Repeat(" ", max(width-ansi.StringWidth(bar)-9, 1)) + buttonStyle.Render("esc ✕")
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, bar, lipgloss.NewStyle().PaddingLeft(1).Render(d.vp.View()))
+	body := lipgloss.NewStyle().PaddingLeft(1).Render(d.vp.View())
+	if tree {
+		tw, divStyle := d.treeWidth(), dividerStyle
+		if d.tree.dragW > 0 {
+			// The divider follows the pointer; the diff is laid out at its new width once it is dropped.
+			tw, divStyle = d.clampTreeWidth(d.tree.dragW), titleStyle
+			body = lipgloss.NewStyle().MaxWidth(max(width-tw-1, 1)).Render(body)
+		}
+		vdiv := divStyle.Render(strings.TrimSuffix(strings.Repeat("│\n", height-1), "\n"))
+		body = lipgloss.JoinHorizontal(lipgloss.Top, d.tree.render(tw, height-1, d.activeFile()), vdiv, body)
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, bar, body)
 }

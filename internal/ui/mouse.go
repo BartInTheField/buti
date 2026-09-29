@@ -33,6 +33,9 @@ const (
 	hitPush        // a branch card's Push button
 	hitMore        // a branch card's ⋯ menu
 	hitDetails
+	hitDetailsTree  // a row of the file tree next to the full-screen diff
+	hitTreeSplit    // the divider between that tree and the diff
+	hitSidebarSplit // the divider between the sidebar and the lanes
 	hitDetailsClose
 	hitButton // an edit mode button; key is its action's
 )
@@ -63,8 +66,13 @@ func (m *Model) hitTest(x, y int) hit {
 		return hit{}
 	}
 	if m.det.full {
-		if y == 0 && x >= m.width-8 {
+		switch {
+		case y == 0 && x >= m.width-8:
 			return hit{kind: hitDetailsClose}
+		case y > 0 && m.det.treeShown() && x < m.det.treeWidth():
+			return hit{kind: hitDetailsTree, row: m.det.tree.offset + y - 3} // below the title bar, header and rule
+		case y > 0 && m.det.treeShown() && x == m.det.treeWidth():
+			return hit{kind: hitTreeSplit}
 		}
 		return hit{kind: hitDetails, line: y - 1}
 	}
@@ -81,6 +89,9 @@ func (m *Model) hitTest(x, y int) hit {
 			return hit{}
 		}
 		return hit{kind: hitEntity, ent: m.files[row].entity(), files: true, row: row}
+	}
+	if x == sw {
+		return hit{kind: hitSidebarSplit}
 	}
 	lanesH, detH := m.split()
 	if detH > 0 && y > lanesH {
@@ -141,6 +152,14 @@ func (m *Model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 	case tea.MouseClickMsg:
 		return m.handleClick(msg)
 	case tea.MouseMotionMsg:
+		if m.det.tree.dragW > 0 {
+			m.det.tree.dragW = max(msg.X, 1)
+			return nil
+		}
+		if m.sidebarDrag > 0 {
+			m.sidebarDrag = max(msg.X, 1)
+			return nil
+		}
 		if m.press != nil {
 			if m.drag == nil {
 				srcs := []entity{m.press.ent}
@@ -155,6 +174,16 @@ func (m *Model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 		}
 	case tea.MouseReleaseMsg:
 		defer func() { m.press, m.drag = nil, nil }()
+		if t := &m.det.tree; t.dragW > 0 {
+			t.width, t.dragW = m.det.clampTreeWidth(t.dragW), 0
+			return nil
+		}
+		if m.sidebarDrag > 0 {
+			m.sidebarW, m.sidebarDrag = m.sidebarWidth(), 0
+			m.clampFiles()
+			m.clampLanes()
+			return nil
+		}
 		if m.drag != nil && m.drag.moved {
 			return m.drop(msg.X, msg.Y)
 		}
@@ -192,11 +221,31 @@ func (m *Model) handleClick(msg tea.MouseClickMsg) tea.Cmd {
 		return nil
 	case hitDetails:
 		marks := m.hunkMarks()
+		m.det.tree.focused = false
 		if !m.det.focused {
 			m.det.focus(marks)
 		}
 		if h.line >= 0 {
 			m.det.clickLine(h.line, msg.Mod&tea.ModShift != 0, marks)
+		}
+		return nil
+	case hitTreeSplit:
+		m.det.tree.dragW = max(msg.X, 1)
+		return nil
+	case hitSidebarSplit:
+		m.sidebarDrag = max(msg.X, 1)
+		return nil
+	case hitDetailsTree:
+		t := &m.det.tree
+		t.focused = true
+		if h.row >= 0 && h.row < len(t.rows) {
+			t.cursor = h.row
+			t.clamp()
+			if path, ok := t.file(); ok {
+				m.det.jumpToFile(path, m.hunkMarks())
+			} else {
+				t.toggle(m.det.data)
+			}
 		}
 		return nil
 	case hitButton:
@@ -333,6 +382,9 @@ func (m *Model) handleWheel(msg tea.MouseWheelMsg) tea.Cmd {
 	}
 	h := m.hitTest(msg.X, msg.Y)
 	switch {
+	case h.kind == hitDetailsTree:
+		m.det.tree.scroll(3 * delta)
+		return nil
 	case h.kind == hitDetails:
 		var cmd tea.Cmd
 		m.det.vp, cmd = m.det.vp.Update(msg)

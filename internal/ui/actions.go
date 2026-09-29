@@ -211,6 +211,13 @@ func init() {
 			}},
 		{key: "D", title: "Full-screen details", group: "View", global: true, when: always,
 			run: func(m *Model, _ []entity) tea.Cmd { return m.setDetailsFull(!m.det.full) }},
+		{key: "T", title: "Show / hide the file tree", group: "View", global: true,
+			when: func(m *Model, _ []entity) bool { return m.det.full },
+			run: func(m *Model, _ []entity) tea.Cmd {
+				m.det.tree.hidden = !m.det.tree.hidden
+				m.det.tree.focused = false
+				return nil
+			}},
 		{key: "o", title: "Open in $EDITOR", group: "View", when: one(entFile, entCommittedFile, entHunk),
 			run: func(m *Model, sel []entity) tea.Cmd {
 				return m.execInteractive("Edit "+sel[0].label, keepSelection, editorCommand(m.pathOf(sel[0])))
