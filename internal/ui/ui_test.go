@@ -396,3 +396,33 @@ func TestModalCallbacksUpdateModel(t *testing.T) {
 		}
 	})
 }
+
+// Dragging the divider next to the sidebar resizes it; the lanes take the rest.
+func TestDragSidebarDivider(t *testing.T) {
+	h := newHarness(t)
+	h.keys("d")
+	x := h.m.sidebarWidth()
+	h.send(tea.MouseClickMsg{X: x, Y: 5, Button: tea.MouseLeft})
+	h.send(tea.MouseMotionMsg{X: 60, Y: 5, Button: tea.MouseLeft})
+	if h.m.sidebarWidth() != 60 || h.m.det.width != 140-x-2 {
+		t.Fatalf("while dragging: sidebar %d, diff %d (the diff keeps its width until the drop)", h.m.sidebarWidth(), h.m.det.width)
+	}
+	for i, l := range strings.Split(h.m.View().Content, "\n") {
+		if w := ansi.StringWidth(l); w > h.m.width {
+			t.Fatalf("while dragging, line %d is %d wide", i, w)
+		}
+	}
+	h.send(tea.MouseReleaseMsg{X: 60, Y: 5, Button: tea.MouseLeft})
+	if h.m.sidebarWidth() != 60 || h.m.rightWidth() != 140-61 || h.m.det.width != 140-62 {
+		t.Fatalf("after the drop: sidebar %d, lanes %d, diff %d", h.m.sidebarWidth(), h.m.rightWidth(), h.m.det.width)
+	}
+	if h.m.press != nil || h.m.drag != nil || h.selectedKey() != "all changes" {
+		t.Fatal("dragging the divider should not select or drag an entity")
+	}
+	h.send(tea.MouseClickMsg{X: 60, Y: 5, Button: tea.MouseLeft})
+	h.send(tea.MouseMotionMsg{X: 5, Y: 5, Button: tea.MouseLeft})
+	h.send(tea.MouseReleaseMsg{X: 5, Y: 5, Button: tea.MouseLeft})
+	if h.m.sidebarWidth() != 12 {
+		t.Fatalf("the sidebar should not shrink below 12 columns, got %d", h.m.sidebarWidth())
+	}
+}

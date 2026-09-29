@@ -73,6 +73,7 @@ A conflicted commit (`✗`) is resolved in edit mode: select it and press `e`, t
 ## Mouse
 
 - Click to select; double-click for the full diff; right-click for actions.
+- Drag the divider next to **Unstaged** to resize it (and, full screen, the one next to the file tree).
 - The card buttons (**Start a commit…**, **Push**, `⋯`) and the "new branch" lane are clickable.
 - The wheel scrolls whatever is under the pointer.
 

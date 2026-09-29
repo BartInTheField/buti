@@ -33,8 +33,9 @@ const (
 	hitPush        // a branch card's Push button
 	hitMore        // a branch card's ⋯ menu
 	hitDetails
-	hitDetailsTree // a row of the file tree next to the full-screen diff
-	hitTreeSplit   // the divider between that tree and the diff
+	hitDetailsTree  // a row of the file tree next to the full-screen diff
+	hitTreeSplit    // the divider between that tree and the diff
+	hitSidebarSplit // the divider between the sidebar and the lanes
 	hitDetailsClose
 	hitButton // an edit mode button; key is its action's
 )
@@ -88,6 +89,9 @@ func (m *Model) hitTest(x, y int) hit {
 			return hit{}
 		}
 		return hit{kind: hitEntity, ent: m.files[row].entity(), files: true, row: row}
+	}
+	if x == sw {
+		return hit{kind: hitSidebarSplit}
 	}
 	lanesH, detH := m.split()
 	if detH > 0 && y > lanesH {
@@ -152,6 +156,10 @@ func (m *Model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 			m.det.tree.dragW = max(msg.X, 1)
 			return nil
 		}
+		if m.sidebarDrag > 0 {
+			m.sidebarDrag = max(msg.X, 1)
+			return nil
+		}
 		if m.press != nil {
 			if m.drag == nil {
 				srcs := []entity{m.press.ent}
@@ -168,6 +176,12 @@ func (m *Model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 		defer func() { m.press, m.drag = nil, nil }()
 		if t := &m.det.tree; t.dragW > 0 {
 			t.width, t.dragW = m.det.clampTreeWidth(t.dragW), 0
+			return nil
+		}
+		if m.sidebarDrag > 0 {
+			m.sidebarW, m.sidebarDrag = m.sidebarWidth(), 0
+			m.clampFiles()
+			m.clampLanes()
 			return nil
 		}
 		if m.drag != nil && m.drag.moved {
@@ -217,6 +231,9 @@ func (m *Model) handleClick(msg tea.MouseClickMsg) tea.Cmd {
 		return nil
 	case hitTreeSplit:
 		m.det.tree.dragW = max(msg.X, 1)
+		return nil
+	case hitSidebarSplit:
+		m.sidebarDrag = max(msg.X, 1)
 		return nil
 	case hitDetailsTree:
 		t := &m.det.tree

@@ -96,6 +96,8 @@ type Model struct {
 	pendingKey    string
 
 	// Mouse.
+	sidebarW     int // set by dragging the sidebar's divider; 0 for the default
+	sidebarDrag  int // where that divider is being dragged to; 0 when it is not
 	lastClickAt  time.Time
 	lastClickKey string
 	press        *pressState
@@ -882,9 +884,19 @@ func (m *Model) handleTreeKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 
 func clamp(v, lo, hi int) int { return max(lo, min(v, hi)) }
 
-func (m *Model) bodyHeight() int   { return max(m.height-1, 1) } // minus footer
-func (m *Model) sidebarWidth() int { return clamp(m.width/4, 24, 40) }
-func (m *Model) rightWidth() int   { return max(m.width-m.sidebarWidth()-1, minLaneWidth) }
+func (m *Model) bodyHeight() int { return max(m.height-1, 1) } // minus footer
+// sidebarWidth is the file tree's width: a share of the screen, or the width it was dragged to.
+func (m *Model) sidebarWidth() int {
+	w := m.sidebarW
+	if m.sidebarDrag > 0 {
+		w = m.sidebarDrag
+	}
+	if w > 0 {
+		return clamp(w, 12, max(m.width-minLaneWidth-1, 12))
+	}
+	return clamp(m.width/4, 24, 40)
+}
+func (m *Model) rightWidth() int { return max(m.width-m.sidebarWidth()-1, minLaneWidth) }
 
 // split returns the lanes' height and the details pane's height (0 when hidden).
 func (m *Model) split() (lanesH, detH int) {
@@ -898,8 +910,8 @@ func (m *Model) split() (lanesH, detH int) {
 
 // layoutDetails sizes the details pane to where render will draw it.
 func (m *Model) layoutDetails() {
-	if m.width == 0 {
-		return
+	if m.width == 0 || m.sidebarDrag > 0 {
+		return // the diff is laid out at its new width once the divider is dropped
 	}
 	switch _, detH := m.split(); {
 	case m.det.full:
@@ -1027,17 +1039,23 @@ func (m *Model) render() string {
 
 func (m *Model) workspaceView() string {
 	h := m.bodyHeight()
-	sw := m.sidebarWidth()
-	vdiv := dividerStyle.Render(strings.TrimSuffix(strings.Repeat("│\n", h), "\n"))
+	sw, rw := m.sidebarWidth(), m.rightWidth()
+	divStyle := dividerStyle
+	if m.sidebarDrag > 0 {
+		divStyle = titleStyle
+	}
+	vdiv := divStyle.Render(strings.TrimSuffix(strings.Repeat("│\n", h), "\n"))
 	right := m.lanesView()
 	if lanesH, detH := m.split(); detH > 0 {
-		rw := m.rightWidth()
 		rule := dividerStyle.Render(strings.Repeat("─", rw))
 		if m.det.focused {
 			rule = titleStyle.Render(strings.Repeat("━", rw))
 		}
 		right = lipgloss.JoinVertical(lipgloss.Left,
 			lipgloss.NewStyle().Height(lanesH).MaxHeight(lanesH).Render(right), rule, m.det.view(rw, detH))
+	}
+	if m.sidebarDrag > 0 {
+		right = lipgloss.NewStyle().MaxWidth(rw).Render(right) // the details pane still has its old width
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, m.sidebarView(sw, h), vdiv, right)
 }

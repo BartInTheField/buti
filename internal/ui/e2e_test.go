@@ -451,3 +451,19 @@ func TestE2EFullDetailsTree(t *testing.T) {
 	h.wantOnScreen("src/api/", "routes.go", "users.go", "2 files changed")
 	h.snap("commit")
 }
+
+func TestE2ESidebarResize(t *testing.T) {
+	h, _ := newRepoHarness(t)
+	h.selectText("README.md")
+	h.keys("d")
+	x := h.m.sidebarWidth()
+	h.send(tea.MouseClickMsg{X: x, Y: 5, Button: tea.MouseLeft})
+	h.send(tea.MouseMotionMsg{X: 24, Y: 5, Button: tea.MouseLeft})
+	h.snap("dragging")
+	h.send(tea.MouseReleaseMsg{X: 24, Y: 5, Button: tea.MouseLeft})
+	if h.m.sidebarWidth() != 24 {
+		t.Fatalf("sidebar width %d, want 24", h.m.sidebarWidth())
+	}
+	h.wantOnScreen("Unstaged", "README.md", "## Usage")
+	h.snap("narrow")
+}
