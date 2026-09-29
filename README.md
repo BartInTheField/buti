@@ -1,11 +1,42 @@
-# buti
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo.svg">
+    <img src="brand/logo-dark-text.svg" alt="buti" width="360">
+  </picture>
+</p>
 
-A terminal UI for [GitButler](https://gitbutler.com). It covers what the built-in `but tui` can do, laid out like the
-desktop app: an **Unstaged** file tree on the left, one lane per stack with branch cards, and a details pane with
-syntax-highlighted diffs. Commit, squash, move and stack with a few keys or by dragging with the mouse. Everything runs
-through the `but` CLI.
+<p align="center">
+  <strong>Parallel</strong> agentic workflow<br>
+  <strong>Code review</strong> your agent can act on<br>
+  On top of <strong>GitButler</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/BartInTheField/buti/releases/latest">Install</a> ·
+  <a href="docs/usage.md">Usage</a> ·
+  <a href="docs/keys.md">Keys</a> ·
+  <a href="https://github.com/BartInTheField/buti/issues/new/choose">Issues</a>
+</p>
+
+buti is a terminal workspace for running several coding agents in parallel, one branch each. Every branch is a lane
+with its commits, the **Unstaged** tree on the left holds what the agents changed, and the details pane shows the
+diff. Commit, squash, move and stack with a key or a drag. Leave review comments on any diff, and the agent reads
+them, fixes each one and marks it resolved. It runs on top of [GitButler](https://gitbutler.com), which does the
+branching.
 
 ![buti: uncommitted files on the left, a lane per stack, and a diff; a file is being committed to a stacked branch](docs/images/screenshot.png)
+
+## Why buti
+
+- **One lane per agent.** Each agent works its own branch. Lanes, branch cards and commits show what is pushed,
+  what is local and what sits on top of what, for all of them at once.
+- **Review your agent acts on.** Press `C` on a diff line, write the comment, run
+  [`/buti-resolve`](docs/usage.md#resolving-comments-with-a-coding-agent), and the agent fixes it and resolves it in
+  place. Or have it review your changes into buti with [`/buti-review`](docs/usage.md#reviewing-with-a-coding-agent)
+  (`buti skill install --agent claude`).
+- **Every operation is a key or a drag.** Select a file, commit or branch, press a verb, pick a target. Or drag it
+  where it should go. `?` lists every key and `ctrl+p` opens the command palette.
+- **On top of GitButler.** Every change is a `but` command; buti never touches git itself. Free and MIT.
 
 ## Install
 
@@ -33,12 +64,7 @@ buti [-C dir] [--diff] [--remember-selection] [--version] [target]
 ```
 
 Select something, press a verb (`c` commit, `r` squash/amend, `m` move, `p` cherry-pick), pick a target and press
-`enter`. Or drag a file, commit or branch onto where it should go. `?` lists every key and `ctrl+p` opens the command
-palette.
-
-Leave review comments on a diff with `C` and have any coding agent fix them with the
-[`/buti-resolve` skill](docs/usage.md#resolving-comments-with-a-coding-agent), or have one review your changes into
-buti with [`/buti-review`](docs/usage.md#reviewing-with-a-coding-agent) (`buti skill install --agent claude`).
+`enter`. Or drag a file, commit or branch onto where it should go.
 
 ## Docs
 
