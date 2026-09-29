@@ -89,6 +89,26 @@ This is the way to check a UI change by eye, including for agents that can read 
 `Workspace-hero` snap, and [Resolving conflicts](conflicts.md) uses the `ResolveInEditMode` ones; `mise run
 readme-screenshot` refreshes them all.
 
+### The demo video
+
+`TestE2EVideo` (`internal/ui/video_test.go`) walks the real UI through the README's flows and, with
+`BUTI_VIDEO=<dir>`, saves every screen as a frame with how long it stays on, its caption and the mouse pointer's cell
+while dragging. `tools/video` renders the frames with freeze and cuts them into a video with ffmpeg, with a title
+card, an end card and captions:
+
+```sh
+mise run video   # -> video/demo.mp4 (1080p) and video/demo.gif (git-ignored)
+```
+
+Change the script in the test to change the video; the recorder's `frame`, `step`, `typeText` and `drag` helpers
+take the time each screen stays on.
+
+The marketing trailer (`trailer/`, a [Remotion](https://www.remotion.dev) project) is cut from the same frames: the
+recorder also notes where texts worth zooming in on are (`videoAnchors`), and `trailer/src/shots.ts` says which
+frame shows when, where the camera looks, and which label and key cap go with it, snapped to the music's bars.
+`mise run trailer` renders `trailer/out/trailer.mp4` plus the X banner and avatar; the brand it uses is in
+`brand/`.
+
 ## CI
 
 `.github/workflows/test.yml` runs on every pull request and push to `main`:

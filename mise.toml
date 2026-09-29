@@ -2,6 +2,7 @@
 go = "1.27.1"
 "go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "latest"
 "go:github.com/charmbracelet/freeze" = "0.2.2"
+gh = { version = "latest", minimum_release_age = "0s" }
 
 [tasks.run]
 description = "Run buti in the current repo"
@@ -24,6 +25,27 @@ run = "go test -count=1 ./..."
 description = "Run the UI end-to-end tests and save screenshots to screenshots/"
 env = { BUTI_INTEGRATION = "1" }
 run = "rm -rf screenshots && BUTI_SCREENSHOTS=$PWD/screenshots go test -count=1 -run E2E ./internal/ui"
+
+[tasks.video]
+description = "Record the demo video with the end-to-end harness and render video/demo.mp4 and video/demo.gif"
+env = { BUTI_INTEGRATION = "1" }
+run = """
+rm -rf video/frames && mkdir -p video
+BUTI_VIDEO=$PWD/video/frames go test -count=1 -run 'TestE2EVideo$' ./internal/ui
+go run ./tools/video -frames video/frames -out video/demo
+"""
+
+[tasks.trailer]
+description = "Render the marketing trailer, X banner and avatar with Remotion from the recorded frames (needs mise run video first)"
+dir = "trailer"
+run = """
+test -d ../video/frames || { echo "run mise run video first"; exit 1; }
+test -d node_modules || npm install
+mkdir -p public/frames && cp ../video/frames/*.png public/frames/ && cp ../video/frames/frames.json src/frames.json
+npx remotion render src/index.ts Trailer out/trailer.mp4
+npx remotion still src/index.ts Banner out/banner.png
+npx remotion still src/index.ts Avatar out/avatar.png
+"""
 
 [tasks.readme-screenshot]
 description = "Refresh the screenshots in docs/images from the end-to-end tests"

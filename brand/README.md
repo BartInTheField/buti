@@ -13,7 +13,7 @@ does the branching; buti is its own thing.
 Order matters: the workflow first, the review loop second, GitButler last. GitButler is the foundation, not the
 headline, so it never leads a sentence about buti. Write "on top of GitButler", never "a GitButler client".
 
-Set the lines as three rows. **Parallel** and **GitButler** in Paper, **Code review** in Mint; the rest in Smoke.
+Set the lines as three rows. **Parallel** and **Code review** in Paper, **GitButler** in Mint; the rest in Smoke.
 
 ## Voice
 

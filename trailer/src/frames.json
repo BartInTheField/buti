@@ -1,0 +1,2208 @@
+[
+  {
+    "file": "0000.ansi",
+    "ms": 3500,
+    "caption": "Unstaged changes on the left, a lane per stack, branches as cards",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0001.ansi",
+    "ms": 400,
+    "caption": "Select anything to read its diff",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0002.ansi",
+    "ms": 1800,
+    "caption": "Select anything to read its diff",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0003.ansi",
+    "ms": 2200,
+    "caption": "Select anything to read its diff",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0004.ansi",
+    "ms": 900,
+    "caption": "Commit: select a file, press c, pick a branch",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0005.ansi",
+    "ms": 900,
+    "caption": "Commit: select a file, press c, pick a branch",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "target": [
+        125,
+        7
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0006.ansi",
+    "ms": 700,
+    "caption": "Commit: select a file, press c, pick a branch",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "target": [
+        59,
+        7
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0007.ansi",
+    "ms": 700,
+    "caption": "Commit: select a file, press c, pick a branch",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "target": [
+        92,
+        7
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0008.ansi",
+    "ms": 700,
+    "caption": "Commit: select a file, press c, pick a branch",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "target": [
+        125,
+        7
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0009.ansi",
+    "ms": 1000,
+    "caption": "Commit: select a file, press c, pick a branch",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "target": [
+        125,
+        16
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0010.ansi",
+    "ms": 700,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0011.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0012.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0013.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0014.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0015.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0016.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0017.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0018.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0019.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0020.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0021.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0022.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0023.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0024.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0025.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0026.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0027.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0028.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0029.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0030.ansi",
+    "ms": 70,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "landed": [
+        46,
+        10
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0031.ansi",
+    "ms": 700,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "landed": [
+        46,
+        10
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0032.ansi",
+    "ms": 300,
+    "caption": "Type a message, press enter",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "landed": [
+        60,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "toast": [
+        110,
+        37
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0033.ansi",
+    "ms": 2200,
+    "caption": "The commit lands where you pointed",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "landed": [
+        60,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "toast": [
+        110,
+        37
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0034.ansi",
+    "ms": 600,
+    "caption": "Or use the mouse: drag a commit onto another to squash them",
+    "pointer": [
+      111,
+      9
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "landed": [
+        60,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0035.ansi",
+    "ms": 90,
+    "caption": "Or use the mouse: drag a commit onto another to squash them",
+    "pointer": [
+      111,
+      9
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0036.ansi",
+    "ms": 90,
+    "caption": "Or use the mouse: drag a commit onto another to squash them",
+    "pointer": [
+      111,
+      9
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        131,
+        9
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0037.ansi",
+    "ms": 90,
+    "caption": "Or use the mouse: drag a commit onto another to squash them",
+    "pointer": [
+      111,
+      9
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        131,
+        9
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0038.ansi",
+    "ms": 90,
+    "caption": "Or use the mouse: drag a commit onto another to squash them",
+    "pointer": [
+      111,
+      9
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        131,
+        9
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0039.ansi",
+    "ms": 90,
+    "caption": "Or use the mouse: drag a commit onto another to squash them",
+    "pointer": [
+      111,
+      9
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        131,
+        9
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0040.ansi",
+    "ms": 90,
+    "caption": "Or use the mouse: drag a commit onto another to squash them",
+    "pointer": [
+      111,
+      9
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        131,
+        9
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0041.ansi",
+    "ms": 90,
+    "caption": "Or use the mouse: drag a commit onto another to squash them",
+    "pointer": [
+      111,
+      10
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        114,
+        11
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        131,
+        9
+      ],
+      "squash": [
+        9,
+        39
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0042.ansi",
+    "ms": 700,
+    "caption": "Or use the mouse: drag a commit onto another to squash them",
+    "pointer": [
+      111,
+      10
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        114,
+        11
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        131,
+        9
+      ],
+      "squash": [
+        9,
+        39
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0043.ansi",
+    "ms": 1600,
+    "caption": "Check the squashed message, press enter",
+    "anchors": {
+      "composer": [
+        44,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "squash": [
+        52,
+        6
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0044.ansi",
+    "ms": 2000,
+    "caption": "Check the squashed message, press enter",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "squash": [
+        99,
+        36
+      ],
+      "toast": [
+        97,
+        36
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0045.ansi",
+    "ms": 600,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      78,
+      9
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0046.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      78,
+      9
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0047.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      71,
+      9
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        74,
+        10
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        98,
+        9
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0048.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      63,
+      8
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        66,
+        9
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0049.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      55,
+      7
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        58,
+        8
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        98,
+        9
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0050.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      48,
+      6
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        51,
+        7
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        98,
+        9
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0051.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      40,
+      5
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        43,
+        6
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0052.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      32,
+      4
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        35,
+        5
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0053.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      25,
+      3
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        28,
+        4
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0054.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      17,
+      2
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        20,
+        3
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0055.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      9,
+      1
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        12,
+        2
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0056.ansi",
+    "ms": 80,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      1,
+      0
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        4,
+        1
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        98,
+        9
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0057.ansi",
+    "ms": 700,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "pointer": [
+      1,
+      0
+    ],
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "dragGhost": [
+        4,
+        1
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "source": [
+        98,
+        9
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0058.ansi",
+    "ms": 2200,
+    "caption": "Drag a commit onto Unstaged to uncommit it",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "toast": [
+        122,
+        37
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0059.ansi",
+    "ms": 900,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0060.ansi",
+    "ms": 600,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0061.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0062.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0063.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0064.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0065.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0066.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0067.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0068.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0069.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0070.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0071.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0072.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0073.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0074.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0075.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0076.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0077.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0078.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0079.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0080.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0081.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0082.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0083.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0084.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0085.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0086.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0087.ansi",
+    "ms": 55,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "comment": [
+        46,
+        12
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0088.ansi",
+    "ms": 600,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "comment": [
+        46,
+        12
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0089.ansi",
+    "ms": 200,
+    "caption": "Leave review comments on a diff for your coding agent",
+    "anchors": {
+      "comment": [
+        51,
+        31
+      ],
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "toast": [
+        122,
+        37
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0090.ansi",
+    "ms": 2200,
+    "caption": "/buti-resolve has the agent fix each one and mark it resolved",
+    "anchors": {
+      "comment": [
+        51,
+        31
+      ],
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "toast": [
+        122,
+        37
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0091.ansi",
+    "ms": 2600,
+    "caption": "/buti-resolve has the agent fix each one and mark it resolved",
+    "anchors": {
+      "comment": [
+        64,
+        30
+      ],
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "resolved": [
+        51,
+        30
+      ],
+      "toast": [
+        51,
+        30
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0092.ansi",
+    "ms": 1000,
+    "caption": "Every command in the palette (ctrl+p) and the searchable help (?)",
+    "anchors": {
+      "comment": [
+        64,
+        30
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "resolved": [
+        51,
+        30
+      ],
+      "toast": [
+        51,
+        30
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0093.ansi",
+    "ms": 80,
+    "caption": "Every command in the palette (ctrl+p) and the searchable help (?)",
+    "anchors": {
+      "comment": [
+        64,
+        30
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "resolved": [
+        51,
+        30
+      ],
+      "toast": [
+        51,
+        30
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0094.ansi",
+    "ms": 80,
+    "caption": "Every command in the palette (ctrl+p) and the searchable help (?)",
+    "anchors": {
+      "comment": [
+        64,
+        30
+      ],
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "resolved": [
+        51,
+        30
+      ],
+      "toast": [
+        51,
+        30
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0095.ansi",
+    "ms": 80,
+    "caption": "Every command in the palette (ctrl+p) and the searchable help (?)",
+    "anchors": {
+      "comment": [
+        64,
+        30
+      ],
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "resolved": [
+        51,
+        30
+      ],
+      "toast": [
+        51,
+        30
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0096.ansi",
+    "ms": 80,
+    "caption": "Every command in the palette (ctrl+p) and the searchable help (?)",
+    "anchors": {
+      "comment": [
+        64,
+        30
+      ],
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "resolved": [
+        51,
+        30
+      ],
+      "toast": [
+        51,
+        30
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0097.ansi",
+    "ms": 80,
+    "caption": "Every command in the palette (ctrl+p) and the searchable help (?)",
+    "anchors": {
+      "comment": [
+        64,
+        30
+      ],
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "resolved": [
+        51,
+        30
+      ],
+      "toast": [
+        51,
+        30
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0098.ansi",
+    "ms": 80,
+    "caption": "Every command in the palette (ctrl+p) and the searchable help (?)",
+    "anchors": {
+      "comment": [
+        64,
+        30
+      ],
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "resolved": [
+        51,
+        30
+      ],
+      "toast": [
+        51,
+        30
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0099.ansi",
+    "ms": 1400,
+    "caption": "Every command in the palette (ctrl+p) and the searchable help (?)",
+    "anchors": {
+      "comment": [
+        64,
+        30
+      ],
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "resolved": [
+        51,
+        30
+      ],
+      "toast": [
+        51,
+        30
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0100.ansi",
+    "ms": 2200,
+    "caption": "Every command in the palette (ctrl+p) and the searchable help (?)",
+    "anchors": {
+      "palette": [
+        53,
+        3
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "file": "0101.ansi",
+    "ms": 1500,
+    "caption": "",
+    "anchors": {
+      "comment": [
+        64,
+        30
+      ],
+      "details": [
+        42,
+        22
+      ],
+      "lanes": [
+        48,
+        2
+      ],
+      "resolved": [
+        51,
+        30
+      ],
+      "toast": [
+        51,
+        30
+      ],
+      "unstaged": [
+        1,
+        0
+      ]
+    }
+  }
+]
