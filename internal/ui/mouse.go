@@ -238,7 +238,15 @@ func (m *Model) handleClick(msg tea.MouseClickMsg) tea.Cmd {
 	case hitDetailsTree:
 		t := &m.det.tree
 		t.focused = true
-		if h.row >= 0 && h.row < len(t.rows) {
+		switch {
+		case h.row < 0 || h.row >= len(t.rows):
+		case t.marker(h.row): // a "more" marker: scroll a page that way
+			if h.row == t.offset {
+				t.scroll(-(t.height - 2))
+			} else {
+				t.scroll(t.height - 2)
+			}
+		default:
 			t.cursor = h.row
 			t.clamp()
 			if path, ok := t.file(); ok {

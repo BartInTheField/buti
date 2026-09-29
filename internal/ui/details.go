@@ -382,7 +382,10 @@ func (d *details) setSize(w, h int) {
 	d.vp.SetWidth(w)
 	d.vp.SetHeight(max(h, 1))
 	d.tree.height = h - 2 // its header and rule
-	d.tree.clamp()
+	d.tree.scroll(0)      // back into range if the tree got taller
+	if !d.tree.focused {
+		d.tree.reveal(d.activeFile())
+	}
 }
 
 // treeShown reports whether the file tree is drawn: full screen, unless hidden or the screen is narrow.

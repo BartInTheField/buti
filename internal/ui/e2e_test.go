@@ -450,6 +450,17 @@ func TestE2EFullDetailsTree(t *testing.T) {
 	h.keys("D")
 	h.wantOnScreen("src/api/", "routes.go", "users.go", "2 files changed")
 	h.snap("commit")
+
+	// On a short screen the tree is cut off: it says so, and follows the diff.
+	h.keys("esc")
+	h.selectText("Unstaged")
+	h.send(tea.WindowSizeMsg{Width: 160, Height: 9})
+	h.keys("D") // the diff starts at README.md, the last row: the tree shows it
+	h.wantOnScreen("↑ 2 more", "README.md")
+	h.snap("short")
+	h.keys("tab", "g") // the cursor to the top row
+	h.wantOnScreen("↓ 2 more", "docs/")
+	h.snap("short-top")
 }
 
 func TestE2ESidebarResize(t *testing.T) {
