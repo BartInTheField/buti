@@ -305,3 +305,49 @@ func TestFullDetailsFileTree(t *testing.T) {
 		t.Fatal("esc should leave full screen")
 	}
 }
+
+// A tree taller than the screen scrolls: it follows the file the diff is at, and marks what is cut off.
+func TestFileTreeScrolls(t *testing.T) {
+	h := newHarness(t)
+	d := testDiff(60, 1)
+	for i := range d.Changes {
+		d.Changes[i].Path = fmt.Sprintf("pkg/file%02d.go", i)
+	}
+	h.but.setDiff(d)
+	h.selectText("Unstaged")
+	h.keys("D")
+	if s := h.screen(); !strings.Contains(s, "↓ ") || strings.Contains(s, "file59.go") || strings.Contains(s, "↑ ") {
+		t.Fatalf("the tree should end with a marker for the rows below:\n%s", s)
+	}
+	h.keys("G") // the last hunk: the diff is at file59.go, and the tree shows it
+	if s := h.screen(); !strings.Contains(s, "file59.go") || !strings.Contains(s, "↑ ") {
+		t.Fatalf("the tree should scroll to the file the diff is at:\n%s", s)
+	}
+	tr := &h.m.det.tree
+	end := len(tr.rows) - tr.height
+	if tr.offset != end {
+		t.Fatalf("tree offset %d, want %d (scrolled to the end)", tr.offset, end)
+	}
+	h.keys("[", "[") // the diff moves to file57.go, which is in view: the tree stays
+	if tr.offset != end {
+		t.Fatalf("the tree should not scroll while the active file is in view: offset %d", tr.offset)
+	}
+	h.send(tea.MouseWheelMsg{X: 3, Y: 10, Button: tea.MouseWheelUp})
+	if tr.offset != end-3 {
+		t.Fatalf("the wheel should scroll the tree away from the active file: offset %d", tr.offset)
+	}
+
+	h.keys("tab", "g", "G") // through the tree with the cursor
+	if tr.cursor != 60 || tr.offset != end {
+		t.Fatalf("G should put the cursor on the last row, in view: cursor %d, offset %d", tr.cursor, tr.offset)
+	}
+	_, y := h.find("↑ ")
+	h.send(tea.MouseClickMsg{X: 3, Y: y, Button: tea.MouseLeft})
+	h.send(tea.MouseReleaseMsg{X: 3, Y: y, Button: tea.MouseLeft})
+	if h.m.det.tree.offset == len(h.m.det.tree.rows)-h.m.det.tree.height {
+		t.Fatal("clicking the marker should scroll the tree up a page")
+	}
+	if h.m.det.tree.cursor != 60 {
+		t.Fatal("clicking the marker should not move the cursor")
+	}
+}

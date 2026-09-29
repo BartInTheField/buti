@@ -22,7 +22,8 @@ type fileTree struct {
 	width     int // set by dragging the divider or +/-; 0 for the default
 	dragW     int // where the divider is being dragged to; 0 when it is not
 	focused   bool
-	hidden    bool // switched off with T
+	hidden    bool   // switched off with T
+	shown     string // the active file last scrolled into view, so the wheel can scroll away from it
 }
 
 // build lists the diff's files, one row per path, keeping the cursor where it was.
@@ -62,16 +63,44 @@ func (t *fileTree) rowOf(path string) int {
 	return -1
 }
 
+// clamp keeps the cursor on a row and in view, a row clear of the "more" markers at the edges.
 func (t *fileTree) clamp() {
 	t.cursor = clamp(t.cursor, 0, max(len(t.rows)-1, 0))
-	h := max(t.height, 1)
-	if t.cursor < t.offset {
-		t.offset = t.cursor
+	t.offset = t.showing(t.cursor)
+}
+
+// showing is the offset that shows row, a row clear of the markers.
+func (t *fileTree) showing(row int) int {
+	h, off := max(t.height, 1), t.offset
+	if row < off+1 {
+		off = row - 1
 	}
-	if t.cursor >= t.offset+h {
-		t.offset = t.cursor - h + 1
+	if row >= off+h-1 {
+		off = row - h + 2
 	}
-	t.offset = clamp(t.offset, 0, max(len(t.rows)-h, 0))
+	return clamp(off, 0, max(len(t.rows)-h, 0))
+}
+
+// reveal scrolls the active file into view when it changed, as the diff moves through the files.
+func (t *fileTree) reveal(active string) {
+	if active == t.shown {
+		return
+	}
+	t.shown = active
+	if i := t.rowOf(active); i >= 0 {
+		t.offset = t.showing(i)
+	}
+}
+
+// more reports how many rows are cut off above and below, each marker's own row included.
+func (t *fileTree) more() (above, below int) {
+	if above = t.offset; above > 0 {
+		above++
+	}
+	if below = max(len(t.rows)-t.offset-max(t.height, 1), 0); below > 0 {
+		below++
+	}
+	return above, below
 }
 
 func (t *fileTree) move(d int) {
@@ -81,6 +110,12 @@ func (t *fileTree) move(d int) {
 
 func (t *fileTree) scroll(d int) {
 	t.offset = clamp(t.offset+d, 0, max(len(t.rows)-max(t.height, 1), 0))
+}
+
+// marker reports whether row is drawn as a "more" marker rather than a file.
+func (t *fileTree) marker(row int) bool {
+	above, below := t.more()
+	return row == t.offset && above > 0 || row == t.offset+max(t.height, 1)-1 && below > 0
 }
 
 // focus gives the tree focus, with the cursor on the active file.
@@ -118,10 +153,17 @@ func (t *fileTree) render(width, height int, active string) string {
 		title = titleStyle.Render("Files")
 	}
 	lines := []string{" " + title + " " + countStyle.Render(itoa(t.n)), dividerStyle.Render(strings.Repeat("─", width))}
-	act := t.rowOf(active)
-	for i := t.offset; i < min(t.offset+height-len(lines), len(t.rows)); i++ {
-		r := t.rows[i]
-		lines = append(lines, " "+r.render(width-1, t.focused && i == t.cursor, rowDeco{active: i == act}))
+	act, end := t.rowOf(active), min(t.offset+height-len(lines), len(t.rows))
+	above, below := t.more()
+	for i := t.offset; i < end; i++ {
+		switch r := t.rows[i]; {
+		case i == t.offset && above > 0:
+			lines = append(lines, mutedStyle.Render(" ↑ "+itoa(above)+" more"))
+		case i == end-1 && below > 0:
+			lines = append(lines, mutedStyle.Render(" ↓ "+itoa(below)+" more"))
+		default:
+			lines = append(lines, " "+r.render(width-1, t.focused && i == t.cursor, rowDeco{active: i == act}))
+		}
 	}
 	return lipgloss.NewStyle().Width(width).Height(height).MaxHeight(height).Render(strings.Join(lines, "\n"))
 }
