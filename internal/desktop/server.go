@@ -91,6 +91,16 @@ func Start(client *but.Client, port int) (*Server, error) {
 	mux.HandleFunc("POST /ops/resolve-finish", s.opResolveFinish)
 	mux.HandleFunc("POST /ops/resolve-cancel", s.opResolveCancel)
 	mux.HandleFunc("POST /exec", s.exec)
+	mux.HandleFunc("POST /open", s.open)
+	mux.HandleFunc("GET /file", s.file)
+	mux.HandleFunc("POST /highlight", s.highlight)
+	mux.HandleFunc("GET /comments", s.listComments)
+	mux.HandleFunc("POST /comments", s.addComment)
+	mux.HandleFunc("POST /comments/edit", s.editComment)
+	mux.HandleFunc("POST /comments/reply", s.replyComment)
+	mux.HandleFunc("POST /comments/resolve", s.resolveComment)
+	mux.HandleFunc("POST /comments/reopen", s.reopenComment)
+	mux.HandleFunc("POST /comments/delete", s.deleteComment)
 	s.http = &http.Server{
 		Handler:           s.wrap(mux),
 		ReadHeaderTimeout: 5 * time.Second,

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -139,7 +140,42 @@ func (s *Server) requireAuth(w http.ResponseWriter, r *http.Request) bool {
 
 func writeButError(w http.ResponseWriter, err error) {
 	status, code, msg, docs := classifyBut(err)
-	writeError(w, status, code, msg, docs)
+	writeError(w, status, code, stripAgentNotice(msg), docs)
+}
+
+// agentNoticeLines start the lines of the notice `but` prints when it runs under a coding
+// agent ("AGENT ACTION REQUIRED: ... run: but skill install"). It is addressed to the agent,
+// not to whoever reads the toast.
+var agentNoticeLines = []string{
+	"Run once: but skill",
+	"Then reload/use the updated skill",
+	"If this warning repeats",
+	"To work effectively with but",
+	"Then read the installed SKILL.md",
+	"This notice repeats",
+}
+
+// stripAgentNotice drops that notice from but's output, so every op reply and error is
+// clean in one place rather than in each toast.
+func stripAgentNotice(out string) string {
+	if !strings.Contains(out, "AGENT ACTION REQUIRED") {
+		return out
+	}
+	var kept []string
+	inNotice := false
+	for _, line := range strings.Split(out, "\n") {
+		t := strings.TrimSpace(line)
+		if strings.Contains(t, "AGENT ACTION REQUIRED") {
+			inNotice = true
+			continue
+		}
+		if inNotice && slices.ContainsFunc(agentNoticeLines, func(p string) bool { return strings.HasPrefix(t, p) }) {
+			continue
+		}
+		inNotice = false
+		kept = append(kept, line)
+	}
+	return strings.TrimSpace(strings.Join(kept, "\n"))
 }
 
 // workspace serves the status document. ?sync=1 syncs pull requests from the forge
@@ -250,17 +286,23 @@ func (s *Server) opAmend(w http.ResponseWriter, r *http.Request) {
 }
 
 // opAbsorb absorbs each source in turn, or every uncommitted change when there are none.
+// It replies with what `but` printed, which says where each change went.
 func (s *Server) opAbsorb(w http.ResponseWriter, r *http.Request) {
-	decodeAndRun(s, w, r, func(ctx context.Context, req sourcesReq) error {
+	decodeAndRunOut(s, w, r, func(ctx context.Context, req sourcesReq) (string, error) {
 		if len(req.Sources) == 0 {
-			return s.client.Absorb(ctx, "")
+			return s.client.Exec(ctx, "absorb")
 		}
+		var outs []string
 		for _, id := range req.Sources {
-			if err := s.client.Absorb(ctx, id); err != nil {
-				return err
+			out, err := s.client.Exec(ctx, "absorb", id)
+			if err != nil {
+				return strings.Join(outs, "\n"), err
+			}
+			if out != "" {
+				outs = append(outs, out)
 			}
 		}
-		return nil
+		return strings.Join(outs, "\n"), nil
 	})
 }
 
@@ -497,7 +539,7 @@ func decodeAndRunOut[T any](s *Server, w http.ResponseWriter, r *http.Request, f
 		return
 	}
 	body := map[string]any{"ok": true}
-	if out != "" {
+	if out = stripAgentNotice(out); out != "" {
 		body["output"] = out
 	}
 	writeJSON(w, http.StatusOK, body)

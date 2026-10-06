@@ -161,6 +161,7 @@ func TestOpsParity(t *testing.T) {
 		"case \"$*\" in\n" +
 		"  status*) cat <<'STATUS'\n" + sampleStatus + "\nSTATUS\n ;;\n" +
 		"  undo*) echo 'Undid commit' ;;\n" +
+		"  absorb*) echo \"Absorbed $2\" ;;\n" +
 		"  'branch list'*) echo '{\"appliedStacks\":[],\"branches\":[{\"name\":\"old\",\"hasLocal\":true,\"lastCommitAt\":1}]}' ;;\n" +
 		"  'branch show'*) echo '{\"reviews\":[{\"url\":\"https://example.com/pr/3\"}]}' ;;\n" +
 		"  'oplog list'*) echo '[{\"id\":\"abc1234def\",\"createdAt\":1,\"details\":{\"operation\":\"CreateCommit\",\"title\":\"CreateCommit\",\"body\":\"\"}}]' ;;\n" +
@@ -173,7 +174,7 @@ func TestOpsParity(t *testing.T) {
 	}{
 		{"/ops/empty-commit", `{"placement":{"above":"c2"}}`, "commit --empty --no-message --above c2", ""},
 		{"/ops/absorb", `{}`, "absorb", ""},
-		{"/ops/absorb", `{"sources":["f1","f2"]}`, "absorb f2", ""},
+		{"/ops/absorb", `{"sources":["f1","f2"]}`, "absorb f2", "Absorbed f1\nAbsorbed f2"},
 		{"/ops/squash", `{"sources":["c3"],"target":"c2","mode":"target"}`, "squash --target c2 --use-target-message c3", ""},
 		{"/ops/reword", `{"target":"c2","message":"better"}`, "reword c2 --message better", ""},
 		{"/ops/discard", `{"targets":["f1"]}`, "discard f1", ""},
@@ -268,5 +269,25 @@ func TestOpsParityValidation(t *testing.T) {
 	}
 	if res := post(t, srv, "/exec", "", `{"line":"status"}`, ""); res.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("exec unauth: %d", res.StatusCode)
+	}
+}
+
+func TestStripAgentNotice(t *testing.T) {
+	notice := "⚠ AGENT ACTION REQUIRED: The GitButler skill is not installed for this agent.\n" +
+		"To work effectively with but, run: but skill install\n" +
+		"Then read the installed SKILL.md path printed by that command and continue.\n" +
+		"This notice repeats until the skill is installed. If it still appears after installing, report it instead of retrying.\n"
+	update := "AGENT ACTION REQUIRED: The GitButler skill is out of date or incomplete.\n" +
+		"Run once: but skill check --update\n" +
+		"Then reload/use the updated skill.\n"
+	for _, tc := range []struct{ in, want string }{
+		{"Absorbed a.txt into abc1234\n", "Absorbed a.txt into abc1234\n"},
+		{notice + "\nAbsorbed a.txt into abc1234\n", "Absorbed a.txt into abc1234"},
+		{"Absorbed a.txt\n" + update + "hint: run but status", "Absorbed a.txt\nhint: run but status"},
+		{notice, ""},
+	} {
+		if got := stripAgentNotice(tc.in); got != tc.want {
+			t.Errorf("stripAgentNotice(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }
