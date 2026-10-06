@@ -1,8 +1,8 @@
-# Desktop spike
+# Desktop
 
-Tauri + React + shadcn/ui window on the Go core. `buti desktop` serves a localhost HTTP API and the webview calls it. The design is [ADR 0001](adr/0001-desktop-embedded-http.md) ([#53](https://github.com/BartInTheField/buti/issues/53), part of [#52](https://github.com/BartInTheField/buti/issues/52)).
+Tauri + React + shadcn/ui window on the Go core. `buti desktop` serves a localhost HTTP API and the webview calls it. The design is [ADR 0001](adr/0001-desktop-embedded-http.md) ([#52](https://github.com/BartInTheField/buti/issues/52)).
 
-This is the shell and one status screen, not the workspace UI. It uses the `but` already on `PATH`. Nothing here downloads or embeds the GitButler CLI.
+The workspace UI (#55) mirrors the TUI: an Unstaged tree, stack lanes with branch cards, and a details/diff pane. Drag a file onto a branch to commit, onto a commit to amend, or drag a commit onto Unstaged / another branch to uncommit or move. Every mutation goes through `internal/but`. The app uses the `but` already on `PATH`; it does not download or embed the GitButler CLI.
 
 ## Layout
 
@@ -111,7 +111,9 @@ The binary is `desktop/src-tauri/target/release/buti-desktop`. macOS also produc
 
 ## What the screen does
 
-The window loads `GET /status` with [TanStack Query](https://tanstack.com/query) and shows a summary: repository path, uncommitted files, stacks and branches, how far upstream is ahead. If `but` is not on `PATH`, the same screen shows that error and a link to the [GitButler CLI install docs](https://docs.gitbutler.com/cli-guides/installation). Refresh refetches the query.
+The window loads `GET /workspace` with [TanStack Query](https://tanstack.com/query) and shows the workspace: Unstaged files on the left, one lane per stack with branch cards and commits, and a diff pane for the selection. Drag-and-drop runs the same verbs as the TUI (commit / amend / move / uncommit) through `POST /ops/...`. If `but` is not on `PATH`, the screen shows that error and a link to the [GitButler CLI install docs](https://docs.gitbutler.com/cli-guides/installation). Refresh refetches the workspace.
+
+`GET /status` still returns the spike summary for curl and older callers.
 
 ## Tests
 

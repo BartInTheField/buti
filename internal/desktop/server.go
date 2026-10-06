@@ -60,6 +60,12 @@ func Start(client *but.Client, port int) (*Server, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("GET /status", s.status)
+	mux.HandleFunc("GET /workspace", s.workspace)
+	mux.HandleFunc("GET /diff", s.diff)
+	mux.HandleFunc("POST /ops/commit", s.opCommit)
+	mux.HandleFunc("POST /ops/amend", s.opAmend)
+	mux.HandleFunc("POST /ops/move", s.opMove)
+	mux.HandleFunc("POST /ops/uncommit", s.opUncommit)
 	s.http = &http.Server{
 		Handler:           s.wrap(mux),
 		ReadHeaderTimeout: 5 * time.Second,
@@ -138,7 +144,7 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			w.Header().Set("Access-Control-Max-Age", "600")
 		}
 		if r.Method == http.MethodOptions {

@@ -40,31 +40,39 @@ HTTP is the boundary [#55](https://github.com/BartInTheField/buti/issues/55) can
 
 ## Routes
 
-Implemented for the spike:
+Implemented:
 
 | Method | Path | Auth | Body |
 | --- | --- | --- | --- |
 | `GET` | `/health` | loopback only | `{"ok": true}` |
 | `GET` | `/status` | loopback + bearer | `{"ok": true, "summary": ...}` or `{"ok": false, "error": {...}}` |
+| `GET` | `/workspace` | loopback + bearer | `{"ok": true, "workspace": ...}` — full status with cliIds (#55) |
+| `GET` | `/diff?id=` | loopback + bearer | `{"ok": true, "diff": ...}` — omit `id` for all uncommitted |
+| `POST` | `/ops/commit` | loopback + bearer | `{ changes, message, placement }` → `but commit` |
+| `POST` | `/ops/amend` | loopback + bearer | `{ target, changes }` → `but amend` |
+| `POST` | `/ops/move` | loopback + bearer | `{ sources, placement }` → `but move` |
+| `POST` | `/ops/uncommit` | loopback + bearer | `{ sources }` → `but uncommit` |
 
-`/status` runs `but status --json -f` through `internal/but` and returns a summary (uncommitted paths, stacks and branches, upstream behind, edit-mode resolution). The raw GitButler document stays on the Go side.
+`/status` returns a summary for the spike screen. `/workspace` returns the full document the workspace UI browses and mutates (cliIds, commits, changes). Both run `but status --json -f` through `internal/but`. Mutations go through the same client; the React shell never shells out to git.
+
+`placement` is `{ "branch": "name" }`, `{ "above"|"below": "id" }`, or `{ "newBranch": true }` (maps to `--unstack` for move).
 
 Errors:
 
 | HTTP | `error.code` | When |
 | --- | --- | --- |
+| 400 | `bad_request` | invalid JSON or missing required fields on an op |
 | 401 | `unauthorized` | missing or wrong bearer token |
 | 403 | `forbidden` | non-loopback peer, or a `Host` that is not this listener |
 | 503 | `but_missing` | `but` is not executable; `docsUrl` points at the GitButler CLI install docs |
 | 502 | `but_failed` | `but` ran and failed; `message` is its stderr |
 
-Not in this spike, sketched so later issues have a place to land:
+Sketched for later:
 
 | Method | Path | Later |
 | --- | --- | --- |
-| `GET` | `/diff?id=` | file, commit, or branch diff (#55) |
-| `POST` | `/ops/...` | commit, amend, move, and the other `internal/but` mutations (#55) |
 | `GET` | `/meta` | resolved `but` path and version (#54) |
+| `POST` | `/ops/...` | squash and the rest of the TUI verbs |
 
 ## Loopback security
 
