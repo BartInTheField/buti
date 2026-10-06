@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { Workspace } from "@/api"
@@ -16,7 +16,12 @@ import {
   type ActionContext,
   type PaletteMode,
 } from "./registry"
+import "./commits"
 import "./builtin"
+import "./conflicts"
+import "./branches"
+import "./review"
+import "./details"
 
 type Props = {
   workspace: Workspace
@@ -75,8 +80,9 @@ export function ActionsProvider({ workspace, sel, ops, children }: Props) {
   }
 
   // The window listener is registered once and reads the latest render's state through this ref.
+  // A layout effect, so a key pressed right after a click already sees what the click selected.
   const latest = useRef({ contextFor, run, paletteOpen: false })
-  useEffect(() => {
+  useLayoutEffect(() => {
     latest.current = { contextFor, run, paletteOpen: palette !== null }
   })
 

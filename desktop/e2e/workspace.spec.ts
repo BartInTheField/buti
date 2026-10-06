@@ -110,7 +110,7 @@ test("dropping a file on a branch asks for a commit message", async ({ page }) =
   await page.mouse.move(c.x, c.box.y + 12, { steps: 5 })
   await page.mouse.up()
   const dialog = page.getByRole("dialog")
-  await expect(dialog.getByText("Commit onto fix-typo.")).toBeVisible()
+  await expect(dialog.getByText("Commit file README.md to branch fix-typo.")).toBeVisible()
   await settle(page)
   await page.screenshot({ path: `${shots}/commit-dialog.png` })
   await dialog.getByRole("button", { name: "Cancel" }).click()

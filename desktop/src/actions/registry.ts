@@ -61,7 +61,11 @@ const registry = new Map<string, Action>()
 
 /** registerActions adds actions; feature modules call it at import time. */
 export function registerActions(...actions: Action[]) {
-  for (const a of actions) registry.set(a.id, a)
+  for (const a of actions) {
+    // Two modules claiming one id would silently drop one of them (hot reload re-registers on purpose).
+    if (registry.has(a.id) && !import.meta.hot) console.warn(`action ${a.id} registered twice`)
+    registry.set(a.id, a)
+  }
 }
 
 export function allActions(): Action[] {

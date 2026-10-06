@@ -2,9 +2,7 @@ import type { Placement } from "@/api"
 import { commitSubject } from "@/api"
 import type { PickItem } from "@/dialogs/dialogs"
 import { describeSubjects, selectionKey, type Selection } from "@/selection"
-import { formatKey } from "./keys"
 import {
-  allOf,
   always,
   anyOf,
   hasUncommitted,
@@ -14,13 +12,13 @@ import {
   type ActionContext,
 } from "./registry"
 
-// Built-in actions: the verbs the workspace already had (commit, amend, move, uncommit,
-// refresh) plus selection, palette and help. Feature modules add their own the same way.
+// Built-in actions: amend all, uncommit and refresh, plus selection, palette and help.
+// Feature modules add their own the same way; the commit verbs live in commits.ts.
 
 /** branchTargets lists every applied branch, top of each lane first, for a target picker. */
 export function branchTargets(ctx: ActionContext, opts: { newBranch?: boolean } = {}) {
   const items: PickItem<Placement>[] = ctx.workspace.stacks.flatMap((st) =>
-    [...st.branches].reverse().map((b) => ({
+    st.branches.map((b) => ({
       value: { branch: b.name },
       label: b.name,
       detail: `${b.commits.length} commit${b.commits.length === 1 ? "" : "s"}`,
@@ -52,70 +50,7 @@ export function commitTargets(ctx: ActionContext, exclude: Selection[] = []) {
   )
 }
 
-function placementLabel(p: Placement): string {
-  return p.newBranch ? "a new branch" : (p.branch ?? "the workspace")
-}
-
-/** commitInto asks for a message and commits changes (all when empty) at placement. */
-export async function commitInto(ctx: ActionContext, changes: string[], placement: Placement) {
-  const message = await ctx.dialogs.prompt({
-    title: "Commit",
-    description: `Commit onto ${placementLabel(placement)}.`,
-    placeholder: "Commit message",
-    multiline: true,
-    submitLabel: "Commit",
-    hint: `${formatKey("mod+enter")} to commit`,
-    validate: (v) => (v.trim() ? null : "A commit needs a message"),
-  })
-  if (message === null) return
-  await ctx.runOp(`Committed to ${placementLabel(placement)}`, () =>
-    ctx.ops.run("commit", { changes, message: message.trim(), placement }),
-  )
-}
-
-const uncommittedKinds = ["unstaged", "file"] as const
-
 registerActions(
-  {
-    id: "commit",
-    title: "Commit…",
-    group: "Commit",
-    keys: ["c"],
-    when: (ctx) =>
-      hasUncommitted(ctx.workspace) &&
-      (allOf(ctx.subjects, ...uncommittedKinds) || one("branch", "commit")(ctx)),
-    run: async (ctx) => {
-      const [s] = ctx.subjects
-      // On a branch or commit, commit everything uncommitted onto that branch (like `but tui`).
-      if (s.kind === "branch" || s.kind === "commit") {
-        const branch = s.kind === "branch" ? s.name : s.branch
-        return commitInto(ctx, [], { branch })
-      }
-      const placement = await ctx.dialogs.pick({
-        title: `Commit ${describeSubjects(ctx.subjects)} onto`,
-        items: branchTargets(ctx, { newBranch: true }),
-      })
-      if (placement) await commitInto(ctx, ids(ctx.subjects), placement)
-    },
-  },
-  {
-    id: "amend-into",
-    title: "Amend into commit…",
-    group: "Commit",
-    keys: ["r"],
-    when: (ctx) => anyOf("file")(ctx) && commitTargets(ctx).length > 0,
-    run: async (ctx) => {
-      const target = await ctx.dialogs.pick({
-        title: `Amend ${describeSubjects(ctx.subjects)} into`,
-        items: commitTargets(ctx),
-      })
-      if (target) {
-        await ctx.runOp("Amended into commit", () =>
-          ctx.ops.run("amend", { target, changes: ids(ctx.subjects) }),
-        )
-      }
-    },
-  },
   {
     id: "amend-all",
     title: "Amend all changes into this",
@@ -133,26 +68,6 @@ registerActions(
       void ctx.runOp(`Amended all changes into ${describeSubjects(ctx.subjects)}`, () =>
         ctx.ops.run("amend", { target: ids(ctx.subjects)[0] }),
       ),
-  },
-  {
-    id: "move",
-    title: "Move…",
-    group: "Branch",
-    keys: ["m"],
-    when: (ctx) => anyOf("commit")(ctx) || one("branch")(ctx),
-    run: async (ctx) => {
-      const placement = await ctx.dialogs.pick({
-        title: `Move ${describeSubjects(ctx.subjects)} onto`,
-        items: branchTargets(ctx, { newBranch: true }).filter(
-          (it) => !ctx.subjects.some((s) => s.kind === "branch" && s.name === it.value.branch),
-        ),
-      })
-      if (placement) {
-        await ctx.runOp(`Moved onto ${placementLabel(placement)}`, () =>
-          ctx.ops.run("move", { sources: ids(ctx.subjects), placement }),
-        )
-      }
-    },
   },
   {
     id: "uncommit",

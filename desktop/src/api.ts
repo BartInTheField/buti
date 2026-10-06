@@ -263,6 +263,19 @@ export async function fetchReviewURL(cfg: ApiConfig, branch: string): Promise<st
   return (await getJSON<{ ok: true; url: string }>(cfg, `/review-url${q}`)).url
 }
 
+export type RepoFile = { path: string; content: string; binary?: boolean }
+
+/** fetchFile reads a repository file; edit mode shows conflicted files this way, as `but diff` is empty there. */
+export async function fetchFile(cfg: ApiConfig, path: string): Promise<RepoFile> {
+  const q = `?path=${encodeURIComponent(path)}`
+  return getJSON<{ ok: true } & RepoFile>(cfg, `/file${q}`)
+}
+
+/** openFiles opens repository files with the OS; editor prefers the default text editor. */
+export async function openFiles(cfg: ApiConfig, paths: string[], editor = false): Promise<void> {
+  await postOp(cfg, "/open", { paths, editor })
+}
+
 export type SquashMode = "combine" | "target" | "source"
 
 /**

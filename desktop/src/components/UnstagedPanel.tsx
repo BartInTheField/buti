@@ -9,6 +9,8 @@ import { ActionContextMenu } from "@/actions/ActionContextMenu"
 import { dropHint, type DragItem, type DropTarget } from "@/dnd"
 import { sameSelection, type Selection, type SelectionModel } from "@/selection"
 import { DropHint } from "./DropHint"
+import { targetClass, useTargetDeco } from "./target/context"
+import { TargetTag } from "./target/TargetTag"
 
 type Props = {
   changes: Change[]
@@ -24,14 +26,18 @@ export function UnstagedPanel({ changes, sel, onItemClick, activeDrag, disabled 
   const { setNodeRef, isOver } = useDroppable({ id: "drop:unstaged", data: unstagedTarget, disabled })
   const hint = isOver ? dropHint(activeDrag, unstagedTarget) : null
   const area: Selection = { kind: "unstaged" }
+  // Only a valid Unstaged gets a ring: dimming the panel would dim the files in it too.
+  const deco = useTargetDeco("unstaged")
 
   return (
     <div
       ref={setNodeRef}
       data-testid="unstaged-panel"
+      data-target-key="unstaged"
       className={cn(
         "relative flex h-full min-h-0 min-w-[180px] flex-col border-r bg-sidebar text-sidebar-foreground",
         hint && "bg-primary/10 ring-2 ring-inset ring-primary/40",
+        deco?.status === "valid" && targetClass(deco, { inset: true }),
       )}
     >
       <ActionContextMenu item={area}>
@@ -51,6 +57,7 @@ export function UnstagedPanel({ changes, sel, onItemClick, activeDrag, disabled 
         </button>
       </ActionContextMenu>
       <DropHint text={hint} className="bottom-3 left-1/2 -translate-x-1/2" />
+      <TargetTag deco={deco} className="bottom-3 left-1/2 -translate-x-1/2" />
       <ScrollArea className="min-h-0 flex-1">
         <ul className="flex flex-col gap-0.5 p-2">
           {changes.length === 0 ? (
@@ -91,12 +98,14 @@ function FileRow({
   const item: Selection = { kind: "file", id: change.cliId, path: change.filePath }
   const selected = sameSelection(sel.selection, item)
   const marked = sel.isMarked(item)
+  const deco = useTargetDeco(`file:${change.cliId}`)
   return (
     <li>
       <ActionContextMenu item={item}>
         <button
           type="button"
           data-testid="file-row"
+          data-target-key={`file:${change.cliId}`}
           ref={setNodeRef}
           {...listeners}
           {...attributes}
@@ -105,6 +114,7 @@ function FileRow({
             selected ? "bg-sidebar-accent font-medium" : "hover:bg-sidebar-accent/70",
             marked && "bg-primary/15 ring-1 ring-inset ring-primary/40",
             isDragging && "opacity-40",
+            targetClass(deco, { inset: true }),
           )}
           onClick={(e) => onItemClick(item, e)}
         >

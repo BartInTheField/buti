@@ -1,0 +1,32 @@
+/* Syntax colours for the diff pane's token classes (internal/desktop/highlight.go tokenClass).
+   Catppuccin Latte in light mode and Mocha in dark mode, the TUI's palette. */
+
+.tok-k { color: #8839ef; }
+.tok-t { color: #df8e1d; }
+.tok-c { color: #fe640b; }
+.tok-f { color: #1e66f5; }
+.tok-b { color: #d20f39; }
+.tok-g { color: #1e66f5; }
+.tok-a { color: #df8e1d; }
+.tok-s { color: #40a02b; }
+.tok-n { color: #fe640b; }
+.tok-p { color: #ea76cb; }
+.tok-m { color: #8c8fa1; font-style: italic; }
+.tok-o { color: #04a5e5; }
+.tok-u { color: #7c7f93; }
+.tok-h { color: #d20f39; font-weight: 600; }
+
+.dark .tok-k { color: #cba6f7; }
+.dark .tok-t { color: #f9e2af; }
+.dark .tok-c { color: #fab387; }
+.dark .tok-f { color: #89b4fa; }
+.dark .tok-b { color: #f38ba8; }
+.dark .tok-g { color: #89b4fa; }
+.dark .tok-a { color: #f9e2af; }
+.dark .tok-s { color: #a6e3a1; }
+.dark .tok-n { color: #fab387; }
+.dark .tok-p { color: #f5c2e7; }
+.dark .tok-m { color: #7f849c; }
+.dark .tok-o { color: #89dceb; }
+.dark .tok-u { color: #9399b2; }
+.dark .tok-h { color: #f38ba8; }

@@ -24,16 +24,19 @@ import {
 import type { Workspace } from "@/api"
 import { ActionsProvider } from "@/actions/ActionsProvider"
 import { toastError } from "@/actions/toast"
-import { commitInto } from "@/actions/builtin"
+import { runPlan } from "@/actions/commits"
 import { useActions } from "@/actions/context"
 import { formatKey } from "@/actions/keys"
 import { ids } from "@/actions/registry"
 import {
+  beginDrag,
+  endDrag as endDragSession,
   innermostAcceptingDroppable,
   resolveDrop,
   type DragItem,
   type DropTarget,
 } from "@/dnd"
+import { entityFor } from "@/target"
 import { holdRefetch, useDiff, useRefreshing, useWorkspaceOps, type WorkspaceOps } from "@/queries"
 import {
   describeSubjects,
@@ -42,7 +45,12 @@ import {
   type Selection,
   type SelectionModel,
 } from "@/selection"
+import { EditModePanel } from "./conflicts/EditModePanel"
+import { BranchesLayer, HistoryButtons, UpstreamButton } from "./branches/BranchesLayer"
+import { DetailsLayout } from "./details/DetailsLayout"
 import { DiffPane } from "./DiffPane"
+import { cancelTarget } from "./target/store"
+import { TargetModeProvider } from "./target/TargetModeProvider"
 import { StackLanes } from "./StackLanes"
 import { UnstagedPanel } from "./UnstagedPanel"
 
@@ -70,7 +78,10 @@ export function WorkspaceView({ workspace, apiUrl, apiToken, error }: Props) {
   const ops = useWorkspaceOps(apiUrl, apiToken)
   return (
     <ActionsProvider workspace={workspace} sel={sel} ops={ops}>
-      <WorkspaceScreen workspace={workspace} sel={sel} ops={ops} error={error} />
+      <TargetModeProvider workspace={workspace}>
+        <WorkspaceScreen workspace={workspace} sel={sel} ops={ops} error={error} />
+      </TargetModeProvider>
+      <BranchesLayer />
     </ActionsProvider>
   )
 }
@@ -115,34 +126,17 @@ function WorkspaceScreen({
     return marked ? ids(sel.marks) : [source.id]
   }
 
-  async function runDrop(source: DragItem, target: DropTarget) {
-    const action = resolveDrop(source, target)
-    if (!action) return
-    const sources = dragSources(source)
-    const ctx = actions.contextFor()
-    const what = sources.length > 1 ? `${sources.length} ${source.kind}s` : source.label
-    switch (action.type) {
-      case "commit":
-        return commitInto(ctx, sources, action.placement)
-      case "amend":
-        await ctx.runOp(`Amended ${what} into “${target.label}”`, () =>
-          ops.run("amend", { target: action.target, changes: sources }),
-        )
-        return
-      case "move":
-        await ctx.runOp(
-          action.placement.newBranch ? "Moved onto a new branch" : `Moved onto ${action.placement.branch}`,
-          () => ops.run("move", { sources, placement: action.placement }),
-        )
-        return
-      case "uncommit":
-        await ctx.runOp(`Uncommitted ${what}`, () => ops.run("uncommit", { sources }))
-        return
-    }
+  /** dragSelections: the marks when the dragged item is marked, else the item itself. */
+  function dragSelections(source: DragItem): Selection[] {
+    const marked = sel.marks.some((m) => m.kind !== "unstaged" && m.kind === source.kind && m.id === source.id)
+    if (marked) return sel.marks
+    const e = entityFor(workspace, source.kind, source.id)
+    return e && e.kind !== "new-branch" ? [e] : []
   }
 
   function endDrag() {
     setActiveDrag(null)
+    endDragSession()
     releaseRefetch.current?.()
     releaseRefetch.current = null
   }
@@ -152,19 +146,23 @@ function WorkspaceScreen({
     if (!data?.kind || !data.id) return
     releaseRefetch.current?.()
     releaseRefetch.current = holdRefetch()
+    cancelTarget()
+    beginDrag(workspace, dragSelections(data))
     setActiveDrag(data)
   }
 
   function onDragEnd(event: DragEndEvent) {
     const source = event.active.data.current as DragItem | undefined
     const target = event.over?.data.current as DropTarget | undefined
+    // Resolved before endDrag ends the session: a drop runs the same plan as the target picker.
+    const plan = source?.kind && target?.kind ? resolveDrop(source, target) : null
     endDrag()
-    if (!source?.kind || !target?.kind) return
+    if (!plan) return
     if (ops.busy) {
       toast.message("Wait for the running operation to finish")
       return
     }
-    void runDrop(source, target).catch(toastError)
+    void runPlan(actions.contextFor(), plan).catch(toastError)
   }
 
   const marked = sel.marks.length
@@ -183,10 +181,9 @@ function WorkspaceScreen({
             </span>
           ) : null}
           {workspace.upstreamState?.behind ? (
-            <span className="text-xs text-muted-foreground">
-              upstream +{workspace.upstreamState.behind}
-            </span>
+            <UpstreamButton behind={workspace.upstreamState.behind} />
           ) : null}
+          <HistoryButtons />
           <Button variant="ghost" size="sm" onClick={() => actions.openPalette("all")}>
             <CommandIcon />
             Commands
@@ -212,15 +209,8 @@ function WorkspaceScreen({
       ) : null}
 
       {workspace.resolving ? (
-        <Alert className="mx-4 mt-3 w-auto">
-          <AlertTitle>Resolving a conflicted commit</AlertTitle>
-          <AlertDescription>
-            {workspace.resolving.conflicted_files?.length ?? 0} conflicted,{" "}
-            {workspace.resolving.resolved_files?.length ?? 0} resolved.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
+        <EditModePanel workspace={workspace} cfg={ops.cfg} />
+      ) : (
       <DndContext
         sensors={sensors}
         collisionDetection={innermostAcceptingDroppable}
@@ -231,8 +221,8 @@ function WorkspaceScreen({
         onDragCancel={endDrag}
         onDragEnd={onDragEnd}
       >
-        <ResizablePanelGroup orientation="vertical" className="min-h-0 flex-1">
-          <ResizablePanel defaultSize="58" minSize="30">
+        <DetailsLayout
+          top={
             <ResizablePanelGroup orientation="horizontal" className="h-full">
               <ResizablePanel defaultSize={240} minSize={180} maxSize={420}>
                 <UnstagedPanel
@@ -254,9 +244,8 @@ function WorkspaceScreen({
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize="42" minSize="20">
+          }
+          details={
             <DiffPane
               selection={sel.selection}
               diff={diff.data}
@@ -264,18 +253,19 @@ function WorkspaceScreen({
               stale={diff.isPlaceholderData}
               error={diff.isError ? (diff.error instanceof Error ? diff.error.message : "Could not load diff") : null}
             />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          }
+        />
         <DragOverlay dropAnimation={null} modifiers={[besideCursor]}>
           {activeDrag ? (
             <div className="w-fit max-w-64 truncate rounded-md border bg-card px-3 py-1.5 text-xs shadow-md">
               {dragSources(activeDrag).length > 1
-                ? `${dragSources(activeDrag).length} ${activeDrag.kind}s`
+                ? `${dragSources(activeDrag).length} ${activeDrag.kind === "cfile" ? "file" : activeDrag.kind}s`
                 : activeDrag.label}
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
+      )}
     </div>
   )
 }
