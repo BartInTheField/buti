@@ -1,8 +1,8 @@
-# Desktop spike
+# Desktop
 
-Tauri + React + shadcn/ui window on the Go core. `buti desktop` serves a localhost HTTP API and the webview calls it. The design is [ADR 0001](adr/0001-desktop-embedded-http.md) ([#53](https://github.com/BartInTheField/buti/issues/53), part of [#52](https://github.com/BartInTheField/buti/issues/52)).
+Tauri + React + shadcn/ui window on the Go core. `buti desktop` serves a localhost HTTP API and the webview calls it. The design is [ADR 0001](adr/0001-desktop-embedded-http.md) ([#52](https://github.com/BartInTheField/buti/issues/52)).
 
-This is the shell and one status screen, not the workspace UI. It uses the `but` already on `PATH`. Nothing here downloads or embeds the GitButler CLI.
+The workspace UI (#55) mirrors the TUI: an Unstaged tree, stack lanes with branch cards, and a details/diff pane. Drag a file onto a branch to commit, onto a commit to amend, or drag a commit onto Unstaged / another branch to uncommit or move. Every mutation goes through `internal/but`. The app uses the `but` already on `PATH`; it does not download or embed the GitButler CLI.
 
 ## Layout
 
@@ -54,19 +54,19 @@ npm install
 
 ## Run
 
-`-C` is the repository `but status` should read, same as the TUI. The flags below come after `desktop`.
+`-C` is the repository `but status` should read, same as the TUI. It goes before `desktop`; the other flags come after it. The window can open another repository later (see [Opening a repository](#opening-a-repository)), so `-C` is only where it starts.
 
 Dev window (compiles the Rust shell on first run, then opens it against the embedded API):
 
 ```sh
-go run ./cmd/buti desktop --dev -C .
+go run ./cmd/buti -C . desktop --dev
 # or: mise run desktop
 ```
 
 API only, no window. The URL and bearer token are printed on stderr:
 
 ```sh
-go run ./cmd/buti desktop --serve -C .
+go run ./cmd/buti -C . desktop --serve
 curl -sS -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/status
 ```
 
@@ -84,7 +84,7 @@ The webview reads `BUTI_API_URL` and `BUTI_API_TOKEN` from the environment throu
 Built shell, after the build below:
 
 ```sh
-go run ./cmd/buti desktop --app desktop/src-tauri/target/release/buti-desktop -C .
+go run ./cmd/buti -C . desktop --app desktop/src-tauri/target/release/buti-desktop
 ```
 
 With no `--dev`, `--serve`, or `--app`, `buti desktop` looks for that binary (debug, then the macOS `.app` bundle) and starts it. `BUTI_DESKTOP_APP` overrides the path.
@@ -105,14 +105,91 @@ cd desktop
 npm run tauri build
 ```
 
-The binary is `desktop/src-tauri/target/release/buti-desktop`. macOS also produces `desktop/src-tauri/target/release/bundle/macos/Buti.app`. Linux produces a binary and, where the packaging tools are installed, a bundle under `target/release/bundle/`. Installers, signing, and updates are out of scope.
+The binary is `desktop/src-tauri/target/release/buti-desktop`. macOS also produces `desktop/src-tauri/target/release/bundle/macos/buti.app`. Linux produces a binary and, where the packaging tools are installed, a bundle under `target/release/bundle/`. Installers, signing, and updates are out of scope.
 
 `npm run tauri build` does not look for `but` and does not copy it into the bundle.
 
 ## What the screen does
 
-The window loads `GET /status` with [TanStack Query](https://tanstack.com/query) and shows a summary: repository path, uncommitted files, stacks and branches, how far upstream is ahead. If `but` is not on `PATH`, the same screen shows that error and a link to the [GitButler CLI install docs](https://docs.gitbutler.com/cli-guides/installation). Refresh refetches the query.
+The window loads `GET /workspace` with [TanStack Query](https://tanstack.com/query) and shows the workspace: Unstaged files on the left, one lane per stack with branch cards and commits, and a diff pane for the selection. Drag-and-drop runs the same verbs as the TUI (commit / amend / move / uncommit) through `POST /ops/...`. If `but` is not on `PATH`, the screen shows that error and a link to the [GitButler CLI install docs](https://docs.gitbutler.com/cli-guides/installation). Refresh syncs pull requests and refetches the workspace, like ctrl+r in the TUI. The workspace is polled every 5 seconds, except during a drag.
+
+![Workspace: Unstaged, stack lanes, and diff](images/desktop/workspace.png)
+
+Hovering a drop target never changes the layout: the hint is an overlay badge and the target only gets a ring. A file over a commit inside a branch card amends; the smallest target under the pointer that accepts the drag wins.
+
+Keys, the command palette (cmd+k or ctrl+p), the help (`?`) and the right-click menus all come from one action registry in `desktop/src/actions/`, which mirrors `internal/ui/actions.go`. Space or cmd/ctrl-click marks files, commits or branches; actions and drags then act on all marks, and esc clears them.
+
+### Opening a repository
+
+Unlike the TUI, the window is not tied to the folder it was started in. The repository name in the header is a menu with the recently opened repositories and **Open folder…** (`cmd/ctrl+O`, also in the palette), which opens the system folder dialog; in a browser it asks for a path instead. The API switches to the folder only if `but status` works there, so a folder that is not a GitButler workspace leaves the current one on screen and shows `but`'s error. Run `but setup` in a git repository first.
+
+Without `-C`, when the working directory is not a workspace, the window reopens the repository it showed last. If there is none, or it is gone, the window shows the folder picker with the recent list instead of an error. The recent list (ten repositories, newest first) is kept in the webview's local storage.
+
+### Branches and history
+
+The TUI's Branch and History verbs (`desktop/src/actions/branches.ts`), with the same keys: `b` new branch (stacked on the selected branch, else a new lane), `B` new branch below, `enter` rename, `P` push (asks before a force push when the remote diverged), `N` create a pull request (title, description, draft), `o` open the branch's pull request, `a` apply a branch, `S` unapply its stack, `L` pull, `u` / `U` undo / redo (the toast names the operation), `H` operation history with restore, `t` go to a branch, ctrl+r reload and sync pull requests. Delete branch, land onto the target and clean up empty branches are in the palette and the menus.
+
+Each branch card has a ⋯ menu with the same actions as right-click, a push-state badge (local, unpushed, diverged, pushed, integrated) and the PR number, both with tooltips. At its foot is a Push button, as in the TUI, greyed out when there is nothing to push; it shows "Pushing…" with a spinner while that branch is pushed, whether by click or `P`. The header has undo, redo and history buttons, and `upstream +N` pulls when clicked; it shows "Pulling…" while a pull runs, also when started with `L`. Clicking the dashed lane makes a new branch in a new lane. Drag the gap right of a lane to widen or narrow it (to read long branch names); double-click it to reset. Widths are remembered per stack. Destructive verbs confirm first and say how to undo. Inside the Tauri window links open through the opener plugin; in a browser, in a new tab.
+
+### Commit verbs and the target picker
+
+The commit verbs work as in the TUI ([usage](usage.md)). `c` commits the selection or the marks (on a branch or commit: everything uncommitted), `r` squashes, amends or uncommits, `m` moves commits or a branch, `p` cherry-picks. Each enters target mode: valid targets in the lanes get a ring, everything else dims, and a bar at the bottom says what the hovered target would do. Click a target to finish, press enter for the selected one, or open a searchable list with `/` (or the bar's **Targets** button). esc cancels. The bar also holds the options: above/below a commit (`a`), a new branch stacked above the target branch (`b`, commit and pick), an empty message (`e`, commit) and keeping the target's message (`u`, squash). A squash that would mix several messages opens the composer with all of them.
+
+Drag-and-drop runs the same plans (the TUI's `dropVerb`): a file onto a branch commits, onto a commit amends; a commit onto a commit squashes, onto Unstaged uncommits, onto a branch moves; a branch onto a branch stacks, onto "new branch" unstacks; a committed file (listed with `f`) onto Unstaged uncommits it, onto another commit or a branch moves it there. `r` on a committed file does the same through the picker.
+
+`enter` rewords a commit (the composer starts with the full message) or renames a branch, `n` inserts an empty commit, `A` absorbs after a confirm and shows where each change went, and `x` discards after a confirm; its toast has an Undo button. All of them are in the right-click menu and the palette too.
+
+The plans live in `desktop/src/target.ts`, a port of `internal/ui/target.go`; `npm test` runs its unit tests.
+
+### Details pane and review comments
+
+The diff pane works like the TUI's details pane. Click a line for the line cursor (or tab into the pane and press `j`): `j`/`k` move it, `J`/`K` scroll, `[`/`]` step hunks, and dragging over lines, shift-click or `v` selects a range. Space marks the hunk under the cursor. Commit, amend and discard then act on the marked hunks, or on the cursor's hunk while the pane has focus. `d` hides the pane and `D` gives it the window, with a file tree you can fold (`T` toggles it). Both also work by dragging the divider. `f` lists a commit's files under it, `F` lists the files of every commit, `y`/`Y` copy, and `/` goes to any file, commit or branch. Syntax highlighting is Chroma on the Go side (`POST /highlight`), the TUI's highlighter. The diff shows plain text until the tokens arrive, and rows are virtualized, so long diffs scroll smoothly.
+
+Review comments use the same store as the TUI and `buti review` (`internal/review`), located on the current workspace the same way. `C` comments on the cursor line or range (cmd/ctrl+S saves). With the cursor on a comment, `e` edits it, `d` deletes it after a confirm, and `x` resolves or reopens it. `z` hides resolved comments, and the palette's “Review comments…” jumps to an open one. The buttons on each thread and the diff's right-click menu do the same with the mouse.
+
+### Conflicts and edit mode
+
+As in the TUI ([Resolving conflicts](conflicts.md)): a conflicted commit has a red **✗ Conflicted** badge in its lane. Select it and press `e` (or right-click → *Resolve in edit mode*) to check it out in edit mode (`but resolve <commit>`). The lanes are then replaced by the commit, its files marked **Conflicted** or **Resolved**, and the selected file as it is on disk, with each side of a conflict coloured. The view refreshes as you remove markers.
+
+| Key | Does |
+| --- | --- |
+| `o` | open every conflicted file in your text editor |
+| `enter` / double-click | open the selected file |
+| `j` / `k` | select a file |
+| `e` | save and exit (`but resolve finish`); asks first if a file still has markers |
+| `x` | cancel (`but resolve cancel --force`) after confirming; your edits are dropped |
+
+Outside edit mode, `o` opens the selected file (uncommitted, in a commit, or the diff's hunk) from the working tree in your text editor and `O` opens it with its default app. A GUI has no terminal for `$EDITOR`, so "editor" is the OS's: `open -t` on macOS, `xdg-open` on Linux (the same as `O` there).
+
+### API
+
+All routes except `/health` need the bearer token. Mutations take a JSON body, run one `but` command at a time, and reply `{"ok":true}` (plus `"output"` when `but` printed something, minus the notice it prints for coding agents) or `{"ok":false,"error":{...}}`.
+
+| Route | Does |
+| --- | --- |
+| `GET /workspace` (`?sync=1`) | `but status`; with sync, pull requests are synced from the forge first |
+| `GET /diff?id=` | the diff of a file, commit or branch, or all uncommitted changes |
+| `GET /repo`, `POST /repo` | the repository the API serves (and whether `-C` or a switch chose it), switch to another (`{"dir":"/abs/path"}`); a switch fails and keeps the current repository when `but status` fails there |
+| `GET /oplog`, `GET /branches`, `GET /review-url?branch=` | operation history, applied and unapplied branches, a branch's PR URL |
+| `POST /ops/commit`, `empty-commit`, `amend`, `absorb`, `squash`, `reword`, `discard` | commits (absorb replies with where each change went) |
+| `POST /ops/move`, `uncommit`, `pick` | move, uncommit, cherry-pick |
+| `POST /ops/branch-new`, `branch-delete`, `apply`, `unapply`, `push`, `pull`, `pr-new`, `land`, `clean` | branches |
+| `POST /ops/undo`, `redo`, `oplog-restore` | history |
+| `POST /ops/resolve-start`, `resolve-finish`, `resolve-cancel` | edit mode for a conflicted commit |
+| `POST /exec` | `{"line":"branch list"}` runs `but branch list`, like the TUI's `:` prompt |
+| `POST /open`, `GET /file?path=` | open repository files with the OS (`{"paths":[...],"editor":true}`), read one (edit mode shows conflicted files this way); paths must stay inside the repository |
+| `GET /comments` | review comments, located on the current workspace |
+| `POST /comments`, `/comments/edit`, `reply`, `resolve`, `reopen`, `delete` | write review comments; an anchor with only a branch goes on the branch's commit that has the lines |
+| `POST /highlight` | Chroma token classes for source texts, by file name |
+
+`desktop/src/api.ts` has a typed function for each (`ops.<name>`), and `useWorkspaceOps().run(name, args)` calls one and refetches what it changed.
+
+`GET /status` still returns the spike summary for curl and older callers.
 
 ## Tests
 
 The Go API is covered by `go test ./internal/desktop` and does not need Node, Rust, or `but`. `mise run test` includes it. The Tauri window is not in CI.
+
+`npm run e2e` (in `desktop/`) runs Playwright against the real screen: it builds the test repository, starts `buti desktop --serve` on it and Vite, then checks that hovering branch cards and commits during a drag never moves them, plus the palette, help, context menu and marks. `e2e/branches.spec.ts` runs the branch and history flows and undoes what it changes; `e2e/commits.spec.ts` runs every commit verb and restores the repository from an oplog snapshot afterwards. `e2e/details.spec.ts` covers the line cursor, hunk marks feeding the target picker, committed files, full screen and review comments, and deletes the comments it wrote. `e2e/repos.spec.ts` starts its own API without `-C` in an empty folder and covers the folder picker, the header menu, a failed switch and reopening the last repository. `e2e/conflicts.spec.ts` builds its own conflicted repository (`mkrepo -conflict`), serves it on the next ports, and records opened files through `BUTI_DESKTOP_OPEN` (a command that replaces `open`/`xdg-open`) rather than opening them.
+
+`BUTI_E2E_PORT` picks the Vite port (default 47310) and `BUTI_E2E_API_PORT` the API's (default: a free port), so checkouts can run side by side. The e2e needs `but` and Go on `PATH` (it skips without `but`) and a Chromium from `npx playwright install chromium`. Screenshots go to `$BUTI_SHOTS`, by default `/tmp/buti-desktop-shots`.

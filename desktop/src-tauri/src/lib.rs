@@ -17,6 +17,10 @@ fn api_config() -> ApiConfig {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    // Opens pull request links in the system browser.
+    .plugin(tauri_plugin_opener::init())
+    // The folder picker: unlike the TUI, the window is not started in a repository.
+    .plugin(tauri_plugin_dialog::init())
     .invoke_handler(tauri::generate_handler![api_config])
     .setup(|app| {
       if cfg!(debug_assertions) {

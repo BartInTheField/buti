@@ -29,6 +29,13 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
+// flagSet reports whether name was passed on the command line, rather than left at its default.
+func flagSet(fs *flag.FlagSet, name string) bool {
+	set := false
+	fs.Visit(func(f *flag.Flag) { set = set || f.Name == name })
+	return set
+}
+
 // run runs buti with args and returns the exit code.
 func run(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("buti", flag.ContinueOnError)
@@ -69,7 +76,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if len(rest) > 0 && !slices.Contains(args[:len(args)-len(rest)], "--") {
 		switch rest[0] {
 		case "desktop":
-			return runDesktop(abs, rest[1:], stdout, stderr)
+			return runDesktop(abs, flagSet(fs, "C"), rest[1:], stdout, stderr)
 		case "review":
 			return runReview(abs, rest[1:], stdout, stderr)
 		case "skill":

@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/bartinthefield/buti/internal/but"
@@ -29,9 +30,12 @@ type Server struct {
 	URL   string
 	Token string
 
-	client *but.Client
+	// client is swapped by POST /repo; read it with but().
+	client atomic.Pointer[but.Client]
 	http   *http.Server
 	host   string // host:port the listener accepted, required on the Host header
+	// chosen is whether the repository was asked for: -C, or POST /repo. Not just the working directory.
+	chosen atomic.Bool
 }
 
 // Start listens on 127.0.0.1 and port (0 picks a free port) and serves until Shutdown.
@@ -52,14 +56,57 @@ func Start(client *but.Client, port int) (*Server, error) {
 	}
 	host := ln.Addr().String()
 	s := &Server{
-		URL:    "http://" + host,
-		Token:  token,
-		client: client,
-		host:   host,
+		URL:   "http://" + host,
+		Token: token,
+		host:  host,
 	}
+	s.client.Store(client)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("GET /status", s.status)
+	mux.HandleFunc("GET /workspace", s.workspace)
+	mux.HandleFunc("GET /repo", s.repo)
+	mux.HandleFunc("POST /repo", s.openRepo)
+	mux.HandleFunc("GET /diff", s.diff)
+	mux.HandleFunc("POST /ops/commit", s.opCommit)
+	mux.HandleFunc("POST /ops/amend", s.opAmend)
+	mux.HandleFunc("POST /ops/move", s.opMove)
+	mux.HandleFunc("GET /oplog", s.oplog)
+	mux.HandleFunc("GET /branches", s.branches)
+	mux.HandleFunc("GET /review-url", s.reviewURL)
+	mux.HandleFunc("POST /ops/uncommit", s.opUncommit)
+	mux.HandleFunc("POST /ops/empty-commit", s.opEmptyCommit)
+	mux.HandleFunc("POST /ops/absorb", s.opAbsorb)
+	mux.HandleFunc("POST /ops/squash", s.opSquash)
+	mux.HandleFunc("POST /ops/reword", s.opReword)
+	mux.HandleFunc("POST /ops/discard", s.opDiscard)
+	mux.HandleFunc("POST /ops/branch-new", s.opBranchNew)
+	mux.HandleFunc("POST /ops/branch-delete", s.opBranchDelete)
+	mux.HandleFunc("POST /ops/pick", s.opPick)
+	mux.HandleFunc("POST /ops/apply", s.opApply)
+	mux.HandleFunc("POST /ops/unapply", s.opUnapply)
+	mux.HandleFunc("POST /ops/push", s.opPush)
+	mux.HandleFunc("POST /ops/pull", s.opPull)
+	mux.HandleFunc("POST /ops/undo", s.opUndo)
+	mux.HandleFunc("POST /ops/redo", s.opRedo)
+	mux.HandleFunc("POST /ops/pr-new", s.opPRNew)
+	mux.HandleFunc("POST /ops/oplog-restore", s.opOplogRestore)
+	mux.HandleFunc("POST /ops/land", s.opLand)
+	mux.HandleFunc("POST /ops/clean", s.opClean)
+	mux.HandleFunc("POST /ops/resolve-start", s.opResolveStart)
+	mux.HandleFunc("POST /ops/resolve-finish", s.opResolveFinish)
+	mux.HandleFunc("POST /ops/resolve-cancel", s.opResolveCancel)
+	mux.HandleFunc("POST /exec", s.exec)
+	mux.HandleFunc("POST /open", s.open)
+	mux.HandleFunc("GET /file", s.file)
+	mux.HandleFunc("POST /highlight", s.highlight)
+	mux.HandleFunc("GET /comments", s.listComments)
+	mux.HandleFunc("POST /comments", s.addComment)
+	mux.HandleFunc("POST /comments/edit", s.editComment)
+	mux.HandleFunc("POST /comments/reply", s.replyComment)
+	mux.HandleFunc("POST /comments/resolve", s.resolveComment)
+	mux.HandleFunc("POST /comments/reopen", s.reopenComment)
+	mux.HandleFunc("POST /comments/delete", s.deleteComment)
 	s.http = &http.Server{
 		Handler:           s.wrap(mux),
 		ReadHeaderTimeout: 5 * time.Second,
@@ -138,7 +185,7 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			w.Header().Set("Access-Control-Max-Age", "600")
 		}
 		if r.Method == http.MethodOptions {
@@ -197,7 +244,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "missing or invalid token", "")
 		return
 	}
-	st, err := s.client.Status(r.Context())
+	st, err := s.but().Status(r.Context())
 	if err != nil {
 		status, code, msg, docs := classifyBut(err)
 		writeError(w, status, code, msg, docs)
@@ -206,7 +253,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, struct {
 		OK      bool    `json:"ok"`
 		Summary Summary `json:"summary"`
-	}{OK: true, Summary: summarize(s.client.Dir, st)})
+	}{OK: true, Summary: summarize(s.but().Dir, st)})
 }
 
 func bearerOK(r *http.Request, token string) bool {

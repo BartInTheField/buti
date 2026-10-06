@@ -2,6 +2,7 @@
 go = "1.27.1"
 "go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "latest"
 "go:github.com/charmbracelet/freeze" = "0.2.2"
+rust = "1.95.0"
 
 [tasks.run]
 description = "Run buti in the current repo"

@@ -779,7 +779,7 @@ func (m *Model) branchPicker([]entity) tea.Cmd {
 
 func (m *Model) butPrompt([]entity) tea.Cmd {
 	m.openModal(newPrompt("Run a but command", "", "e.g. branch list", "Runs in the repository; output is shown afterwards.", func(m *Model, line string) tea.Cmd {
-		args, err := splitArgs(strings.TrimPrefix(strings.TrimSpace(line), "but "))
+		args, err := but.SplitArgs(strings.TrimPrefix(strings.TrimSpace(line), "but "))
 		if err != nil {
 			return m.notify(toastError, err.Error())
 		}

@@ -225,8 +225,13 @@ func (b *builder) build() {
 
 // Conflict adds a branch changelog whose commit adds its own CHANGELOG.md,
 // then pulls, which rebases that commit onto the upstream one into a conflict.
+// It also sets the identity in the repository's config: resolving the commit writes a
+// reflog entry, which needs a committer even when buti runs without testrepo.Env
+// (the mkrepo command line, the desktop e2e tests).
 func (r *Repo) Conflict() error {
 	b := &builder{r: r}
+	b.run("git", "config", "user.name", "Ada Lovelace")
+	b.run("git", "config", "user.email", "ada@example.com")
 	b.run("but", "branch", "new", "changelog")
 	b.write("CHANGELOG.md", "# Changelog\n\n- Token auth\n")
 	b.commit("changelog", "Start a changelog", "CHANGELOG.md")

@@ -1,67 +1,190 @@
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import { CircleAlertIcon, ExternalLinkIcon, RefreshCwIcon, UnplugIcon } from "lucide-react"
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/reui/alert"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { StatusRequestError, type StatusError, type Summary } from "./api"
-import { useApiConfig, useWorkspaceStatus } from "./queries"
+import { Spinner } from "@/components/ui/spinner"
+import { eventKeys, typingIn } from "@/actions/keys"
+import { toastError } from "@/actions/toast"
+import { ApiRequestError, type ApiConfig, type ApiError } from "./api"
+import { BrandLogo } from "./components/BrandMark"
+import { RepoPicker } from "./components/RepoPicker"
+import { WorkspaceView } from "./components/WorkspaceView"
+import { useApiConfig, useWorkspace } from "./queries"
+import { RepoProvider } from "./RepoProvider"
+import { useRepo, useRepoSwitcher } from "./repo"
 
 export default function App() {
   const config = useApiConfig()
-  const status = useWorkspaceStatus(config.data?.url, config.data?.token)
-  const waiting =
-    config.isPending || (Boolean(config.data?.url) && status.isPending)
 
-  function refresh() {
-    if (!config.data?.url) {
-      void config.refetch()
-      return
-    }
-    void status.refetch()
+  if (config.isPending) {
+    return (
+      <Shell>
+        <Loading />
+      </Shell>
+    )
+  }
+
+  if (!config.data?.url) {
+    return (
+      <Shell>
+        <Alert variant="destructive">
+          <UnplugIcon />
+          <AlertTitle>No local API</AlertTitle>
+          <AlertDescription>
+            <p>
+              Start this window with <code className="font-mono text-xs text-foreground">buti desktop</code> so it
+              receives the loopback API address.
+            </p>
+          </AlertDescription>
+        </Alert>
+      </Shell>
+    )
   }
 
   return (
-    <main className="mx-auto flex min-h-svh max-w-2xl flex-col gap-6 px-6 py-10">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-muted-foreground">buti desktop</p>
-          <h1 className="font-heading text-2xl font-medium tracking-tight">
-            Workspace
-          </h1>
-        </div>
-        <Button
-          variant="outline"
-          onClick={refresh}
-          disabled={waiting || status.isFetching}
-        >
-          Refresh
-        </Button>
-      </header>
-      {waiting ? (
-        <p className="text-sm text-muted-foreground">Reading status…</p>
-      ) : null}
-      {config.isSuccess && !config.data.url ? (
-        <Alert variant="destructive">
-          <AlertTitle>No local API</AlertTitle>
-          <AlertDescription>
-            Start this window with <code>buti desktop</code> so it receives the
-            loopback API address.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {status.isError ? <StatusAlert error={toStatusError(status.error)} /> : null}
-      {status.data ? <SummaryCard summary={status.data} /> : null}
-    </main>
+    <RepoProvider cfg={config.data}>
+      <OpenFolderKey />
+      <Screen cfg={config.data} />
+    </RepoProvider>
   )
 }
 
-function toStatusError(err: unknown): StatusError {
-  if (err instanceof StatusRequestError) {
+function Screen({ cfg }: { cfg: ApiConfig }) {
+  const repo = useRepo(cfg)
+  const repos = useRepoSwitcher()
+  const workspace = useWorkspace(cfg.url, cfg.token)
+  const reopen = useReopenLast(cfg, workspace.isError)
+
+  // A workspace that loaded is worth offering again, here and on the next start.
+  const shownDir = workspace.data?.repo
+  useEffect(() => {
+    if (shownDir) repos.shown(shownDir)
+  }, [shownDir]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (workspace.isPending || reopen.pending || repos.switching) {
+    return (
+      <Shell>
+        <Loading />
+      </Shell>
+    )
+  }
+
+  // Once a workspace is on screen it stays: a failed background refetch is shown inline.
+  if (workspace.data) {
+    return (
+      <WorkspaceView
+        key={workspace.data.repo}
+        workspace={workspace.data}
+        apiUrl={cfg.url}
+        apiToken={cfg.token}
+        error={workspace.isError ? toApiError(workspace.error).message : null}
+      />
+    )
+  }
+
+  const err = toApiError(workspace.error)
+  // Without `but` no folder helps: say how to install it rather than offering folders.
+  if (err.code === "but_missing") {
+    return (
+      <Shell onRefresh={() => void workspace.refetch()} refreshing={workspace.isFetching}>
+        <StatusAlert error={err} />
+      </Shell>
+    )
+  }
+  // A window started outside a repository (no -C) just asks for one.
+  const quiet = repo.data && !repo.data.chosen
+  return (
+    <Shell onRefresh={() => void workspace.refetch()} refreshing={workspace.isFetching}>
+      <RepoPicker error={quiet ? undefined : { title: "Could not read workspace", message: err.message }} />
+    </Shell>
+  )
+}
+
+/**
+ * useReopenLast opens the most recent repository once, when `buti desktop` ran without -C and the
+ * working directory is not a workspace: the window was not started in a folder the way the TUI is.
+ */
+function useReopenLast(cfg: ApiConfig, failed: boolean) {
+  const repo = useRepo(cfg)
+  const repos = useRepoSwitcher()
+  const [tried, setTried] = useState(false)
+  const last = repos.recent.find((d) => d !== repo.data?.dir)
+  const pending = failed && !tried && repo.data?.chosen === false && Boolean(last)
+
+  useEffect(() => {
+    if (!pending || !last) return
+    // A repository that is gone or no longer a workspace leaves the picker on screen.
+    void repos.open(last).then(
+      () => setTried(true),
+      () => {
+        setTried(true)
+        repos.forget(last)
+      },
+    )
+  }, [pending, last]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { pending }
+}
+
+/**
+ * OpenFolderKey binds cmd/ctrl+O on every screen, the picker included. On the workspace the
+ * "repo.open" action has the same key; whichever listener runs first prevents the other.
+ */
+function OpenFolderKey() {
+  const repos = useRepoSwitcher()
+  const latest = useRef(repos)
+  useEffect(() => {
+    latest.current = repos
+  })
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.defaultPrevented || typingIn(e.target) || !eventKeys(e).includes("mod+o")) return
+      e.preventDefault()
+      if (!latest.current.switching) void latest.current.choose().catch(toastError)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
+  return null
+}
+
+function Shell({
+  children,
+  onRefresh,
+  refreshing,
+}: {
+  children: ReactNode
+  onRefresh?: () => void
+  refreshing?: boolean
+}) {
+  return (
+    <div className="flex min-h-svh flex-col">
+      {/* The workspace header's frame, so switching screens does not move the brand. */}
+      <header className="flex h-11 shrink-0 items-center justify-between gap-3 border-b px-3">
+        <BrandLogo />
+        {onRefresh ? (
+          <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
+            <RefreshCwIcon className={refreshing ? "animate-spin" : undefined} />
+            Refresh
+          </Button>
+        ) : null}
+      </header>
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-6 px-6 pt-[12vh] pb-10">{children}</main>
+    </div>
+  )
+}
+
+function Loading() {
+  return (
+    <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+      <Spinner aria-hidden="true" />
+      Reading workspace…
+    </p>
+  )
+}
+
+function toApiError(err: unknown): ApiError {
+  if (err instanceof ApiRequestError) {
     return { code: err.code, message: err.message, docsUrl: err.docsUrl }
   }
   return {
@@ -70,109 +193,28 @@ function toStatusError(err: unknown): StatusError {
   }
 }
 
-function StatusAlert({ error }: { error: StatusError }) {
+function StatusAlert({ error }: { error: ApiError }) {
   const title =
     error.code === "but_missing"
       ? "GitButler CLI not found"
-      : "Could not read status"
+      : "Could not read workspace"
   return (
     <Alert variant="destructive">
+      <CircleAlertIcon />
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>
         <p>{error.message}</p>
-        {error.docsUrl ? (
-          <p className="mt-2">
-            <a
-              className="underline underline-offset-3"
-              href={error.docsUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Install the GitButler CLI
-            </a>
-          </p>
-        ) : null}
       </AlertDescription>
+      {error.docsUrl ? (
+        <AlertAction>
+          <Button variant="outline" size="sm" asChild>
+            <a href={error.docsUrl} target="_blank" rel="noreferrer">
+              Install the GitButler CLI
+              <ExternalLinkIcon data-icon="inline-end" />
+            </a>
+          </Button>
+        </AlertAction>
+      ) : null}
     </Alert>
-  )
-}
-
-function SummaryCard({ summary }: { summary: Summary }) {
-  const name = summary.repo.split(/[/\\]/).filter(Boolean).pop() ?? summary.repo
-  const hidden = summary.uncommitted - summary.uncommittedPaths.length
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{name}</CardTitle>
-        <CardDescription className="break-all">{summary.repo}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {summary.resolving ? (
-          <Alert>
-            <AlertTitle>Resolving a conflicted commit</AlertTitle>
-            <AlertDescription>
-              {summary.resolving.conflicted} conflicted,{" "}
-              {summary.resolving.resolved} resolved.
-            </AlertDescription>
-          </Alert>
-        ) : null}
-        <dl className="grid grid-cols-3 gap-3 text-sm">
-          <Stat label="Uncommitted" value={String(summary.uncommitted)} />
-          <Stat label="Stacks" value={String(summary.stacks.length)} />
-          <Stat label="Upstream ahead" value={String(summary.upstreamBehind)} />
-        </dl>
-        {summary.uncommittedPaths.length > 0 ? (
-          <section>
-            <h2 className="mb-1 text-sm font-medium">Uncommitted</h2>
-            <ul className="font-mono text-xs text-muted-foreground">
-              {summary.uncommittedPaths.map((path) => (
-                <li key={path}>{path}</li>
-              ))}
-              {hidden > 0 ? <li>and {hidden} more</li> : null}
-            </ul>
-          </section>
-        ) : null}
-        <section>
-          <h2 className="mb-1 text-sm font-medium">Stacks</h2>
-          {summary.stacks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No applied stacks.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {summary.stacks.map((stack, i) => (
-                <li key={i} className="text-sm">
-                  {stack.branches.map((branch, j) => (
-                    <span key={branch.name}>
-                      {j > 0 ? (
-                        <span className="text-muted-foreground"> ← </span>
-                      ) : null}
-                      <span className="font-medium">{branch.name}</span>
-                      <span className="text-muted-foreground">
-                        {" "}
-                        {branch.commits}
-                        {branch.upstream > 0 ? `+${branch.upstream}` : ""}
-                        {branch.pr ? ` ${branch.pr}` : ""}
-                        {branch.status ? ` ${branch.status}` : ""}
-                      </span>
-                    </span>
-                  ))}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </CardContent>
-      <CardFooter className="text-xs text-muted-foreground">
-        From <code>but status --json</code> via the local API.
-      </CardFooter>
-    </Card>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-muted/60 px-3 py-2">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-lg font-medium tabular-nums">{value}</dd>
-    </div>
   )
 }
