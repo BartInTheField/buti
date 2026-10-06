@@ -38,7 +38,7 @@ export function UnstagedPanel({
     <div
       ref={drop.setNodeRef}
       className={cn(
-        "flex h-full min-h-0 flex-col border-r bg-sidebar text-sidebar-foreground",
+        "flex h-full min-h-0 min-w-[180px] flex-col border-r bg-sidebar text-sidebar-foreground",
         over && "bg-primary/10 ring-2 ring-inset ring-primary/40",
       )}
     >

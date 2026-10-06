@@ -3,8 +3,11 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  closestCorners,
+  pointerWithin,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core"
@@ -27,6 +30,15 @@ import { CommitDialog } from "./CommitDialog"
 import { DiffPane } from "./DiffPane"
 import { StackLanes } from "./StackLanes"
 import { UnstagedPanel } from "./UnstagedPanel"
+
+/** Prefer the droppable under the pointer; fall back to nearest corners. */
+const workspaceCollision: CollisionDetection = (args) => {
+  const pointed = pointerWithin(args)
+  if (pointed.length > 0) {
+    return pointed
+  }
+  return closestCorners(args)
+}
 
 type Props = {
   workspace: Workspace
@@ -67,7 +79,7 @@ export function WorkspaceView({
   async function runDrop(source: DragItem, target: DropTarget) {
     const action = resolveDrop(source, target)
     if (!action) {
-      toast.message("That drop does nothing")
+      toast.message(`Cannot drop ${source.kind} onto ${target.kind}`)
       return
     }
     try {
@@ -118,10 +130,12 @@ export function WorkspaceView({
 
   function onDragEnd(event: DragEndEvent) {
     const source = event.active.data.current as DragItem | undefined
-    const target = event.over?.data.current as DropTarget | undefined
+    const overData = event.over?.data.current as DropTarget | undefined
     setActiveDrag(null)
-    if (!source || !target || ops.busy) return
-    void runDrop(source, target)
+    if (!source?.kind || !overData?.kind || ops.busy) {
+      return
+    }
+    void runDrop(source, overData)
   }
 
   async function confirmCommit(message: string) {
@@ -177,14 +191,15 @@ export function WorkspaceView({
 
       <DndContext
         sensors={sensors}
+        collisionDetection={workspaceCollision}
         onDragStart={onDragStart}
         onDragCancel={() => setActiveDrag(null)}
         onDragEnd={onDragEnd}
       >
         <ResizablePanelGroup orientation="vertical" className="min-h-0 flex-1">
-          <ResizablePanel defaultSize={58} minSize={30}>
+          <ResizablePanel defaultSize="58" minSize="30">
             <ResizablePanelGroup orientation="horizontal" className="h-full">
-              <ResizablePanel defaultSize={22} minSize={16} maxSize={40}>
+              <ResizablePanel defaultSize={240} minSize={180} maxSize={420}>
                 <UnstagedPanel
                   changes={workspace.uncommittedChanges}
                   selection={selection}
@@ -194,7 +209,7 @@ export function WorkspaceView({
                 />
               </ResizablePanel>
               <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={78} minSize={40}>
+              <ResizablePanel defaultSize="78" minSize="40">
                 <StackLanes
                   stacks={workspace.stacks}
                   selection={selection}
@@ -206,7 +221,7 @@ export function WorkspaceView({
             </ResizablePanelGroup>
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={42} minSize={20}>
+          <ResizablePanel defaultSize="42" minSize="20">
             <DiffPane
               selection={selection}
               diff={diff.data}

@@ -115,20 +115,20 @@ function BranchCard({
 
   return (
     <div
-      ref={(node) => {
-        drop.setNodeRef(node)
-        drag.setNodeRef(node)
-      }}
+      ref={drop.setNodeRef}
       className={cn(
         "rounded-lg border bg-card text-card-foreground shadow-xs",
         over && "ring-2 ring-primary/50",
         selected && "border-primary/40",
-        drag.isDragging && "opacity-40",
       )}
     >
       <button
         type="button"
-        className="flex w-full cursor-grab items-center gap-2 border-b px-3 py-2 text-left active:cursor-grabbing"
+        ref={drag.setNodeRef}
+        className={cn(
+          "flex w-full cursor-grab items-center gap-2 border-b px-3 py-2 text-left active:cursor-grabbing",
+          drag.isDragging && "opacity-40",
+        )}
         {...drag.listeners}
         {...drag.attributes}
         onClick={() =>
