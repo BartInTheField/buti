@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react"
+import { useState, type MouseEvent, type PointerEvent } from "react"
 import { useDraggable, useDroppable } from "@dnd-kit/core"
 import { GitBranchIcon, PlusIcon } from "lucide-react"
 import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame"
@@ -19,6 +19,14 @@ import { DropHint } from "./DropHint"
 import { ConflictBadge } from "./conflicts/ConflictBadge"
 import { targetClass, useTargetDeco } from "./target/context"
 import { TargetTag } from "./target/TargetTag"
+import {
+  clampLaneWidth,
+  defaultLaneWidth,
+  loadLaneWidths,
+  saveLaneWidths,
+  setLaneWidth,
+  type LaneWidths,
+} from "@/laneWidths"
 
 type Props = {
   stacks: Stack[]
@@ -28,7 +36,21 @@ type Props = {
   disabled?: boolean
 }
 
+/** laneKey names a stack by its bottom branch, which outlives the stack's cli id. */
+function laneKey(stack: Stack): string {
+  return stack.branches.at(-1)?.name ?? stack.cliId
+}
+
 export function StackLanes({ stacks, sel, onItemClick, activeDrag, disabled }: Props) {
+  const [widths, setWidths] = useState<LaneWidths>(loadLaneWidths)
+  function resize(key: string, w: number, persist: boolean) {
+    setWidths((prev) => {
+      const next = setLaneWidth(prev, key, w)
+      if (persist) saveLaneWidths(next)
+      return next
+    })
+  }
+
   return (
     <ScrollArea className="h-full min-h-0 flex-1">
       <div className="flex h-full min-h-[280px] gap-3 p-3">
@@ -37,25 +59,90 @@ export function StackLanes({ stacks, sel, onItemClick, activeDrag, disabled }: P
             No applied stacks.
           </p>
         ) : (
-          stacks.map((stack) => (
-            <div key={stack.cliId} className="flex w-64 shrink-0 flex-col gap-2" data-testid="lane">
-              {/* Top of the stack first, as `but status` lists it and the TUI shows it. */}
-              {stack.branches.map((branch) => (
-                <BranchCard
-                  key={branch.cliId}
-                  branch={branch}
-                  sel={sel}
-                  onItemClick={onItemClick}
-                  activeDrag={activeDrag}
-                  disabled={disabled}
-                />
-              ))}
-            </div>
-          ))
+          stacks.map((stack) => {
+            const key = laneKey(stack)
+            const width = widths[key] ?? defaultLaneWidth
+            return (
+              <div
+                key={stack.cliId}
+                className="relative flex shrink-0 flex-col gap-2"
+                style={{ width }}
+                data-testid="lane"
+              >
+                {/* Top of the stack first, as `but status` lists it and the TUI shows it. */}
+                {stack.branches.map((branch) => (
+                  <BranchCard
+                    key={branch.cliId}
+                    branch={branch}
+                    sel={sel}
+                    onItemClick={onItemClick}
+                    activeDrag={activeDrag}
+                    disabled={disabled}
+                  />
+                ))}
+                <LaneResizeHandle width={width} onResize={(w, persist) => resize(key, w, persist)} />
+              </div>
+            )
+          })
         )}
         <NewBranchLane activeDrag={activeDrag} disabled={disabled} />
       </div>
     </ScrollArea>
+  )
+}
+
+/**
+ * LaneResizeHandle sits in the gap right of a lane: drag it to widen or narrow the lane,
+ * double-click to reset. The width is saved when the drag ends.
+ */
+function LaneResizeHandle({ width, onResize }: { width: number; onResize: (w: number, persist: boolean) => void }) {
+  const [drag, setDrag] = useState<{ x: number; width: number; last: number } | null>(null)
+
+  function onPointerDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDrag({ x: e.clientX, width, last: width })
+  }
+  function onPointerMove(e: PointerEvent<HTMLDivElement>) {
+    if (!drag) return
+    const w = clampLaneWidth(drag.width + e.clientX - drag.x)
+    if (w === drag.last) return
+    setDrag({ ...drag, last: w })
+    onResize(w, false)
+  }
+  function onPointerUp(e: PointerEvent<HTMLDivElement>) {
+    if (!drag) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    onResize(drag.last, true)
+    setDrag(null)
+  }
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize lane"
+      aria-valuenow={width}
+      title="Drag to resize the lane, double-click to reset"
+      data-testid="lane-resize"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={() => onResize(defaultLaneWidth, true)}
+      // Fills the 12px gap between lanes; the line shows on hover and while dragging.
+      className="group/resize absolute top-0 -right-3 bottom-0 z-10 flex w-3 cursor-col-resize touch-none justify-center"
+    >
+      <div
+        className={cn(
+          "h-full w-px rounded-full bg-transparent transition-colors group-hover/resize:bg-primary/50",
+          drag && "bg-primary",
+        )}
+      />
+    </div>
   )
 }
 

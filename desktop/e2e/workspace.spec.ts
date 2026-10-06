@@ -157,3 +157,23 @@ test("palette, help, context menu and marks", async ({ page }) => {
 test("workspace overview", async ({ page }) => {
   await page.screenshot({ path: `${shots}/workspace.png` })
 })
+
+test("dragging a lane's edge resizes it, keeps the width on reload, and double-click resets it", async ({ page }) => {
+  const lane = page.getByTestId("lane").filter({ has: page.locator('[data-branch="fix-typo"]') })
+  const handle = lane.getByTestId("lane-resize")
+  const before = (await lane.boundingBox())!.width
+
+  const h = await center(handle)
+  await page.mouse.move(h.x, h.y)
+  await page.mouse.down()
+  await page.mouse.move(h.x + 160, h.y, { steps: 6 })
+  await page.mouse.up()
+  await expect.poll(async () => (await lane.boundingBox())!.width).toBeCloseTo(before + 160, -1)
+  await page.screenshot({ path: `${shots}/lane-resized.png` })
+
+  await page.reload()
+  await expect.poll(async () => (await lane.boundingBox())!.width).toBeCloseTo(before + 160, -1)
+
+  await handle.dblclick()
+  await expect.poll(async () => (await lane.boundingBox())!.width).toBeCloseTo(before, 0)
+})
