@@ -359,3 +359,14 @@ func TestOnBranch(t *testing.T) {
 		t.Fatal("a line no commit has was placed")
 	}
 }
+
+// An uncommitted diff lists one entry per hunk: a comment on a later hunk is still found.
+func TestLocateLaterHunk(t *testing.T) {
+	f := workspace("c1", tokenV1)
+	first, second := fileDiff("README.md", "@@ -1,1 +1,2 @@\n # demo\n+intro\n"), fileDiff("README.md", "@@ -40,1 +41,2 @@\n end\n+appendix\n")
+	f.diffs["rl"] = &but.Diff{Changes: append(first.Changes, second.Changes...)}
+	a := Anchor{Kind: KindUnassigned, Path: "README.md", Side: SideNew, Line: 42, EndLine: 42, LineText: "appendix"}
+	if l := locateOne(t, f, a); l.Status != StatusOpen || l.Moved() || l.Target != "zz" {
+		t.Fatalf("got %+v", l)
+	}
+}

@@ -252,12 +252,7 @@ func (d *details) fileDiff(path string) *but.FileDiff {
 	if d.data == nil {
 		return nil
 	}
-	for i := range d.data.Changes {
-		if d.data.Changes[i].Path == path {
-			return &d.data.Changes[i]
-		}
-	}
-	return nil
+	return d.data.File(path)
 }
 
 // cursorNote is the comment under the line cursor.
