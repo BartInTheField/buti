@@ -40,3 +40,7 @@ run = "go run ./internal/testrepo/mkrepo \"$(mktemp -d)\""
 
 [tasks.lint]
 run = "golangci-lint run"
+
+[tasks.desktop]
+description = "Run the desktop spike: loopback API plus the Tauri dev window"
+run = "go run ./cmd/buti desktop --dev"

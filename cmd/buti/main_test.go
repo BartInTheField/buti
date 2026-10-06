@@ -22,6 +22,26 @@ func runButi(args ...string) (code int, stdout, stderr string) {
 	return code, out.String(), errOut.String()
 }
 
+func TestDesktopCommand(t *testing.T) {
+	code, _, stderr := runButi("--help")
+	if code != 0 || !strings.Contains(stderr, "buti [-C dir] desktop") {
+		t.Fatalf("--help: exit %d\n%s", code, stderr)
+	}
+	code, _, stderr = runButi("desktop", "--help")
+	if code != 0 || !strings.Contains(stderr, "--serve") || !strings.Contains(stderr, "--dev") {
+		t.Fatalf("desktop --help: exit %d\n%s", code, stderr)
+	}
+	code, _, stderr = runButi("desktop", "--serve", "--dev")
+	if code != 1 || !strings.Contains(stderr, "--serve") {
+		t.Fatalf("both flags: exit %d\n%s", code, stderr)
+	}
+	missing := filepath.Join(t.TempDir(), "missing-buti-desktop")
+	code, _, stderr = runButi("desktop", "--app", missing)
+	if code != 1 || !strings.Contains(stderr, missing) {
+		t.Fatalf("missing app: exit %d\n%s", code, stderr)
+	}
+}
+
 func TestHelpDocumentsReview(t *testing.T) {
 	code, _, stderr := runButi("--help")
 	if code != 0 || !strings.Contains(stderr, "buti [-C dir] review <command>") ||
