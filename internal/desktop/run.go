@@ -16,7 +16,9 @@ import (
 
 // Config is how `buti desktop` starts the API and, unless ServeOnly, the Tauri window.
 type Config struct {
-	Dir        string
+	Dir string
+	// DirChosen is whether the user passed Dir (-C); if not, the window may switch to a recent repository.
+	DirChosen  bool
 	Port       int
 	ServeOnly  bool
 	Dev        bool
@@ -43,6 +45,9 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 	client := but.New(cfg.Dir)
 	srv, err := Start(client, cfg.Port)
+	if err == nil {
+		srv.chosen.Store(cfg.DirChosen)
+	}
 	if err != nil {
 		return err
 	}

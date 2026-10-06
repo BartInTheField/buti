@@ -54,7 +54,7 @@ npm install
 
 ## Run
 
-`-C` is the repository `but status` should read, same as the TUI. It goes before `desktop`; the other flags come after it.
+`-C` is the repository `but status` should read, same as the TUI. It goes before `desktop`; the other flags come after it. The window can open another repository later (see [Opening a repository](#opening-a-repository)), so `-C` is only where it starts.
 
 Dev window (compiles the Rust shell on first run, then opens it against the embedded API):
 
@@ -119,6 +119,12 @@ Hovering a drop target never changes the layout: the hint is an overlay badge an
 
 Keys, the command palette (cmd+k or ctrl+p), the help (`?`) and the right-click menus all come from one action registry in `desktop/src/actions/`, which mirrors `internal/ui/actions.go`. Space or cmd/ctrl-click marks files, commits or branches; actions and drags then act on all marks, and esc clears them.
 
+### Opening a repository
+
+Unlike the TUI, the window is not tied to the folder it was started in. The repository name in the header is a menu with the recently opened repositories and **Open folder…** (`cmd/ctrl+O`, also in the palette), which opens the system folder dialog; in a browser it asks for a path instead. The API switches to the folder only if `but status` works there, so a folder that is not a GitButler workspace leaves the current one on screen and shows `but`'s error. Run `but setup` in a git repository first.
+
+Without `-C`, when the working directory is not a workspace, the window reopens the repository it showed last. If there is none, or it is gone, the window shows the folder picker with the recent list instead of an error. The recent list (ten repositories, newest first) is kept in the webview's local storage.
+
 ### Branches and history
 
 The TUI's Branch and History verbs (`desktop/src/actions/branches.ts`), with the same keys: `b` new branch (stacked on the selected branch, else a new lane), `B` new branch below, `enter` rename, `P` push (asks before a force push when the remote diverged), `N` create a pull request (title, description, draft), `o` open the branch's pull request, `a` apply a branch, `S` unapply its stack, `L` pull, `u` / `U` undo / redo (the toast names the operation), `H` operation history with restore, `t` go to a branch, ctrl+r reload and sync pull requests. Delete branch, land onto the target and clean up empty branches are in the palette and the menus.
@@ -163,6 +169,7 @@ All routes except `/health` need the bearer token. Mutations take a JSON body, r
 | --- | --- |
 | `GET /workspace` (`?sync=1`) | `but status`; with sync, pull requests are synced from the forge first |
 | `GET /diff?id=` | the diff of a file, commit or branch, or all uncommitted changes |
+| `GET /repo`, `POST /repo` | the repository the API serves (and whether `-C` or a switch chose it), switch to another (`{"dir":"/abs/path"}`); a switch fails and keeps the current repository when `but status` fails there |
 | `GET /oplog`, `GET /branches`, `GET /review-url?branch=` | operation history, applied and unapplied branches, a branch's PR URL |
 | `POST /ops/commit`, `empty-commit`, `amend`, `absorb`, `squash`, `reword`, `discard` | commits (absorb replies with where each change went) |
 | `POST /ops/move`, `uncommit`, `pick` | move, uncommit, cherry-pick |
@@ -183,6 +190,6 @@ All routes except `/health` need the bearer token. Mutations take a JSON body, r
 
 The Go API is covered by `go test ./internal/desktop` and does not need Node, Rust, or `but`. `mise run test` includes it. The Tauri window is not in CI.
 
-`npm run e2e` (in `desktop/`) runs Playwright against the real screen: it builds the test repository, starts `buti desktop --serve` on it and Vite, then checks that hovering branch cards and commits during a drag never moves them, plus the palette, help, context menu and marks. `e2e/branches.spec.ts` runs the branch and history flows and undoes what it changes; `e2e/commits.spec.ts` runs every commit verb and restores the repository from an oplog snapshot afterwards. `e2e/details.spec.ts` covers the line cursor, hunk marks feeding the target picker, committed files, full screen and review comments, and deletes the comments it wrote. `e2e/conflicts.spec.ts` builds its own conflicted repository (`mkrepo -conflict`), serves it on the next ports, and records opened files through `BUTI_DESKTOP_OPEN` (a command that replaces `open`/`xdg-open`) rather than opening them.
+`npm run e2e` (in `desktop/`) runs Playwright against the real screen: it builds the test repository, starts `buti desktop --serve` on it and Vite, then checks that hovering branch cards and commits during a drag never moves them, plus the palette, help, context menu and marks. `e2e/branches.spec.ts` runs the branch and history flows and undoes what it changes; `e2e/commits.spec.ts` runs every commit verb and restores the repository from an oplog snapshot afterwards. `e2e/details.spec.ts` covers the line cursor, hunk marks feeding the target picker, committed files, full screen and review comments, and deletes the comments it wrote. `e2e/repos.spec.ts` starts its own API without `-C` in an empty folder and covers the folder picker, the header menu, a failed switch and reopening the last repository. `e2e/conflicts.spec.ts` builds its own conflicted repository (`mkrepo -conflict`), serves it on the next ports, and records opened files through `BUTI_DESKTOP_OPEN` (a command that replaces `open`/`xdg-open`) rather than opening them.
 
 `BUTI_E2E_PORT` picks the Vite port (default 47310) and `BUTI_E2E_API_PORT` the API's (default: a free port), so checkouts can run side by side. The e2e needs `but` and Go on `PATH` (it skips without `but`) and a Chromium from `npx playwright install chromium`. Screenshots go to `$BUTI_SHOTS`, by default `/tmp/buti-desktop-shots`.

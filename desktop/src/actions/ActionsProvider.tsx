@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import type { Workspace } from "@/api"
 import { useDialogs } from "@/dialogs/dialogs"
 import type { WorkspaceOps } from "@/queries"
+import { useRepoSwitcher } from "@/repo"
 import type { Selection, SelectionModel } from "@/selection"
 import { ActionsContext, type Actions } from "./context"
 import { eventKeys, typingIn } from "./keys"
@@ -37,6 +38,7 @@ type Props = {
  */
 export function ActionsProvider({ workspace, sel, ops, children }: Props) {
   const dialogs = useDialogs()
+  const repos = useRepoSwitcher()
   const queryClient = useQueryClient()
   const [palette, setPalette] = useState<PaletteMode | null>(null)
 
@@ -49,7 +51,7 @@ export function ActionsProvider({ workspace, sel, ops, children }: Props) {
       ops,
       dialogs,
       queryClient,
-      ui: { openPalette: (mode = "all") => setPalette(mode) },
+      ui: { openPalette: (mode = "all") => setPalette(mode), chooseRepo: repos.choose },
       runOp: async (title, fn) => {
         try {
           const res = await fn()

@@ -11,6 +11,8 @@ export type ActionGroup = (typeof actionGroups)[number]
 /** UI hooks the workspace screen exposes to actions. */
 export type ActionUI = {
   openPalette: (mode?: PaletteMode) => void
+  /** chooseRepo opens the folder picker and switches repository; false when cancelled. */
+  chooseRepo: () => Promise<boolean>
 }
 
 export type PaletteMode = "all" | "selection" | "help"

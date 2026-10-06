@@ -149,6 +149,18 @@ registerActions(
     run: (ctx) => ctx.ui.openPalette("help"),
   },
   {
+    id: "repo.open",
+    title: "Open repository…",
+    group: "View",
+    keys: ["mod+o"],
+    global: true,
+    resolving: true,
+    when: always,
+    run: async (ctx) => {
+      await ctx.ui.chooseRepo()
+    },
+  },
+  {
     id: "palette",
     title: "Command palette",
     group: "View",

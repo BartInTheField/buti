@@ -58,15 +58,15 @@ var (
 func (s *Server) comments() (*commentCache, error) {
 	commentCachesMu.Lock()
 	defer commentCachesMu.Unlock()
-	if c, ok := commentCaches[s.client.Dir]; ok {
+	if c, ok := commentCaches[s.but().Dir]; ok {
 		return c, nil
 	}
-	store, err := review.Open(s.client.Dir)
+	store, err := review.Open(s.but().Dir)
 	if err != nil {
 		return nil, err
 	}
 	c := &commentCache{store: store}
-	commentCaches[s.client.Dir] = c
+	commentCaches[s.but().Dir] = c
 	return c, nil
 }
 
@@ -88,7 +88,7 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "review_failed", err.Error(), "")
 		return
 	}
-	located, err := cc.locate(r.Context(), s.client)
+	located, err := cc.locate(r.Context(), s.but())
 	if err != nil {
 		var be *but.Error
 		if errors.As(err, &be) {
@@ -172,11 +172,11 @@ func (s *Server) addComment(w http.ResponseWriter, r *http.Request) {
 	commentOp(s, w, r, func(ctx context.Context, store *review.Store, req addCommentReq) (*review.Comment, error) {
 		a := req.Anchor
 		if a.Kind == "" && a.Branch != "" {
-			st, err := s.client.Status(ctx)
+			st, err := s.but().Status(ctx)
 			if err != nil {
 				return nil, err
 			}
-			if a, err = review.OnBranch(ctx, st, s.client, a.Branch, a); err != nil {
+			if a, err = review.OnBranch(ctx, st, s.but(), a.Branch, a); err != nil {
 				return nil, err
 			}
 		}

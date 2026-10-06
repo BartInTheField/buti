@@ -10,7 +10,7 @@ import (
 
 func TestOpenAndFile(t *testing.T) {
 	srv := start(t, writeBut(t, "#!/bin/sh\nexit 1\n"))
-	dir := srv.client.Dir
+	dir := srv.but().Dir
 	if err := os.WriteFile(filepath.Join(dir, "CHANGELOG.md"), []byte("<<<<<<< ours\na\n=======\nb\n>>>>>>> theirs\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

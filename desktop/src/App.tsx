@@ -1,26 +1,20 @@
-import type { ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { ApiRequestError, type ApiError } from "./api"
+import { eventKeys, typingIn } from "@/actions/keys"
+import { toastError } from "@/actions/toast"
+import { ApiRequestError, type ApiConfig, type ApiError } from "./api"
 import { BrandLogo } from "./components/BrandMark"
+import { RepoPicker } from "./components/RepoPicker"
 import { WorkspaceView } from "./components/WorkspaceView"
 import { useApiConfig, useWorkspace } from "./queries"
+import { RepoProvider } from "./RepoProvider"
+import { useRepo, useRepoSwitcher } from "./repo"
 
 export default function App() {
   const config = useApiConfig()
-  const workspace = useWorkspace(config.data?.url, config.data?.token)
-  const waiting =
-    config.isPending || (Boolean(config.data?.url) && workspace.isPending)
 
-  function refresh() {
-    if (!config.data?.url) {
-      void config.refetch()
-      return
-    }
-    void workspace.refetch()
-  }
-
-  if (waiting) {
+  if (config.isPending) {
     return (
       <Shell>
         <p className="text-sm text-muted-foreground">Reading workspace…</p>
@@ -28,7 +22,7 @@ export default function App() {
     )
   }
 
-  if (config.isSuccess && !config.data.url) {
+  if (!config.data?.url) {
     return (
       <Shell>
         <Alert variant="destructive">
@@ -42,31 +36,111 @@ export default function App() {
     )
   }
 
+  return (
+    <RepoProvider cfg={config.data}>
+      <OpenFolderKey />
+      <Screen cfg={config.data} />
+    </RepoProvider>
+  )
+}
+
+function Screen({ cfg }: { cfg: ApiConfig }) {
+  const repo = useRepo(cfg)
+  const repos = useRepoSwitcher()
+  const workspace = useWorkspace(cfg.url, cfg.token)
+  const reopen = useReopenLast(cfg, workspace.isError)
+
+  // A workspace that loaded is worth offering again, here and on the next start.
+  const shownDir = workspace.data?.repo
+  useEffect(() => {
+    if (shownDir) repos.shown(shownDir)
+  }, [shownDir]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (workspace.isPending || reopen.pending || repos.switching) {
+    return (
+      <Shell>
+        <p className="text-sm text-muted-foreground">Reading workspace…</p>
+      </Shell>
+    )
+  }
+
   // Once a workspace is on screen it stays: a failed background refetch is shown inline.
-  if (workspace.data && config.data) {
+  if (workspace.data) {
     return (
       <WorkspaceView
+        key={workspace.data.repo}
         workspace={workspace.data}
-        apiUrl={config.data.url}
-        apiToken={config.data.token}
+        apiUrl={cfg.url}
+        apiToken={cfg.token}
         error={workspace.isError ? toApiError(workspace.error).message : null}
       />
     )
   }
 
-  if (workspace.isError) {
+  const err = toApiError(workspace.error)
+  // Without `but` no folder helps: say how to install it rather than offering folders.
+  if (err.code === "but_missing") {
     return (
-      <Shell onRefresh={refresh} refreshing={workspace.isFetching}>
-        <StatusAlert error={toApiError(workspace.error)} />
+      <Shell onRefresh={() => void workspace.refetch()} refreshing={workspace.isFetching}>
+        <StatusAlert error={err} />
       </Shell>
     )
   }
-
+  // A window started outside a repository (no -C) just asks for one.
+  const quiet = repo.data && !repo.data.chosen
   return (
-    <Shell onRefresh={refresh}>
-      <p className="text-sm text-muted-foreground">No workspace data.</p>
+    <Shell onRefresh={() => void workspace.refetch()} refreshing={workspace.isFetching}>
+      <RepoPicker error={quiet ? undefined : { title: "Could not read workspace", message: err.message }} />
     </Shell>
   )
+}
+
+/**
+ * useReopenLast opens the most recent repository once, when `buti desktop` ran without -C and the
+ * working directory is not a workspace: the window was not started in a folder the way the TUI is.
+ */
+function useReopenLast(cfg: ApiConfig, failed: boolean) {
+  const repo = useRepo(cfg)
+  const repos = useRepoSwitcher()
+  const [tried, setTried] = useState(false)
+  const last = repos.recent.find((d) => d !== repo.data?.dir)
+  const pending = failed && !tried && repo.data?.chosen === false && Boolean(last)
+
+  useEffect(() => {
+    if (!pending || !last) return
+    // A repository that is gone or no longer a workspace leaves the picker on screen.
+    void repos.open(last).then(
+      () => setTried(true),
+      () => {
+        setTried(true)
+        repos.forget(last)
+      },
+    )
+  }, [pending, last]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { pending }
+}
+
+/**
+ * OpenFolderKey binds cmd/ctrl+O on every screen, the picker included. On the workspace the
+ * "repo.open" action has the same key; whichever listener runs first prevents the other.
+ */
+function OpenFolderKey() {
+  const repos = useRepoSwitcher()
+  const latest = useRef(repos)
+  useEffect(() => {
+    latest.current = repos
+  })
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.defaultPrevented || typingIn(e.target) || !eventKeys(e).includes("mod+o")) return
+      e.preventDefault()
+      if (!latest.current.switching) void latest.current.choose().catch(toastError)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
+  return null
 }
 
 function Shell({

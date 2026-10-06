@@ -184,9 +184,9 @@ func (s *Server) workspace(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAuth(w, r) {
 		return
 	}
-	status := s.client.Status
+	status := s.but().Status
 	if r.URL.Query().Get("sync") == "1" {
-		status = s.client.SyncedStatus
+		status = s.but().SyncedStatus
 	}
 	st, err := status(r.Context())
 	if err != nil {
@@ -196,14 +196,14 @@ func (s *Server) workspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, struct {
 		OK        bool      `json:"ok"`
 		Workspace Workspace `json:"workspace"`
-	}{OK: true, Workspace: workspaceFrom(s.client.Dir, st)})
+	}{OK: true, Workspace: workspaceFrom(s.but().Dir, st)})
 }
 
 func (s *Server) diff(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAuth(w, r) {
 		return
 	}
-	d, err := s.client.Diff(r.Context(), r.URL.Query().Get("id"))
+	d, err := s.but().Diff(r.Context(), r.URL.Query().Get("id"))
 	if err != nil {
 		writeButError(w, err)
 		return
@@ -218,7 +218,7 @@ func (s *Server) oplog(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAuth(w, r) {
 		return
 	}
-	entries, err := s.client.Oplog(r.Context())
+	entries, err := s.but().Oplog(r.Context())
 	if err != nil {
 		writeButError(w, err)
 		return
@@ -236,7 +236,7 @@ func (s *Server) branches(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAuth(w, r) {
 		return
 	}
-	b, err := s.client.Branches(r.Context())
+	b, err := s.but().Branches(r.Context())
 	if err != nil {
 		writeButError(w, err)
 		return
@@ -256,7 +256,7 @@ func (s *Server) reviewURL(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "branch is required", "")
 		return
 	}
-	url, err := s.client.ReviewURL(r.Context(), branch)
+	url, err := s.but().ReviewURL(r.Context(), branch)
 	if err != nil {
 		writeButError(w, err)
 		return
@@ -266,13 +266,13 @@ func (s *Server) reviewURL(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) opCommit(w http.ResponseWriter, r *http.Request) {
 	decodeAndRun(s, w, r, func(ctx context.Context, req commitReq) error {
-		return s.client.Commit(ctx, req.Changes, req.Message, req.Placement.toBut())
+		return s.but().Commit(ctx, req.Changes, req.Message, req.Placement.toBut())
 	})
 }
 
 func (s *Server) opEmptyCommit(w http.ResponseWriter, r *http.Request) {
 	decodeAndRun(s, w, r, func(ctx context.Context, req emptyCommitReq) error {
-		return s.client.EmptyCommit(ctx, req.Message, req.Placement.toBut())
+		return s.but().EmptyCommit(ctx, req.Message, req.Placement.toBut())
 	})
 }
 
@@ -281,7 +281,7 @@ func (s *Server) opAmend(w http.ResponseWriter, r *http.Request) {
 		if err := required(req.Target != "", "target is required"); err != nil {
 			return err
 		}
-		return s.client.Amend(ctx, req.Target, req.Changes)
+		return s.but().Amend(ctx, req.Target, req.Changes)
 	})
 }
 
@@ -290,11 +290,11 @@ func (s *Server) opAmend(w http.ResponseWriter, r *http.Request) {
 func (s *Server) opAbsorb(w http.ResponseWriter, r *http.Request) {
 	decodeAndRunOut(s, w, r, func(ctx context.Context, req sourcesReq) (string, error) {
 		if len(req.Sources) == 0 {
-			return s.client.Exec(ctx, "absorb")
+			return s.but().Exec(ctx, "absorb")
 		}
 		var outs []string
 		for _, id := range req.Sources {
-			out, err := s.client.Exec(ctx, "absorb", id)
+			out, err := s.but().Exec(ctx, "absorb", id)
 			if err != nil {
 				return strings.Join(outs, "\n"), err
 			}
@@ -322,7 +322,7 @@ func (s *Server) opSquash(w http.ResponseWriter, r *http.Request) {
 		default:
 			return badRequestError{msg: `mode must be "combine", "target" or "source"`}
 		}
-		return s.client.Squash(ctx, req.Sources, req.Target, mode, req.Message)
+		return s.but().Squash(ctx, req.Sources, req.Target, mode, req.Message)
 	})
 }
 
@@ -331,7 +331,7 @@ func (s *Server) opMove(w http.ResponseWriter, r *http.Request) {
 		if err := required(len(req.Sources) > 0, "sources are required"); err != nil {
 			return err
 		}
-		return s.client.Move(ctx, req.Sources, req.Placement.toBut())
+		return s.but().Move(ctx, req.Sources, req.Placement.toBut())
 	})
 }
 
@@ -340,7 +340,7 @@ func (s *Server) opUncommit(w http.ResponseWriter, r *http.Request) {
 		if err := required(len(req.Sources) > 0, "sources are required"); err != nil {
 			return err
 		}
-		return s.client.Uncommit(ctx, req.Sources)
+		return s.but().Uncommit(ctx, req.Sources)
 	})
 }
 
@@ -352,7 +352,7 @@ func (s *Server) opReword(w http.ResponseWriter, r *http.Request) {
 		if err := required(strings.TrimSpace(req.Message) != "", "message is required"); err != nil {
 			return err
 		}
-		return s.client.Reword(ctx, req.Target, req.Message)
+		return s.but().Reword(ctx, req.Target, req.Message)
 	})
 }
 
@@ -360,14 +360,14 @@ func (s *Server) opReword(w http.ResponseWriter, r *http.Request) {
 // Discard on the TUI's Unstaged area does.
 func (s *Server) opDiscard(w http.ResponseWriter, r *http.Request) {
 	decodeAndRun(s, w, r, func(ctx context.Context, req targetsReq) error {
-		return s.client.Discard(ctx, req.Targets)
+		return s.but().Discard(ctx, req.Targets)
 	})
 }
 
 func (s *Server) opBranchNew(w http.ResponseWriter, r *http.Request) {
 	decodeAndRun(s, w, r, func(ctx context.Context, req branchNewReq) error {
 		name := strings.Join(strings.Fields(req.Name), "-")
-		return s.client.BranchNew(ctx, name, req.Placement.toBut())
+		return s.but().BranchNew(ctx, name, req.Placement.toBut())
 	})
 }
 
@@ -376,7 +376,7 @@ func (s *Server) opBranchDelete(w http.ResponseWriter, r *http.Request) {
 		if err := required(len(req.Branches) > 0, "branches are required"); err != nil {
 			return err
 		}
-		return s.client.BranchDelete(ctx, req.Branches)
+		return s.but().BranchDelete(ctx, req.Branches)
 	})
 }
 
@@ -385,7 +385,7 @@ func (s *Server) opPick(w http.ResponseWriter, r *http.Request) {
 		if err := required(len(req.Sources) > 0, "sources are required"); err != nil {
 			return err
 		}
-		return s.client.Pick(ctx, req.Sources, req.Placement.toBut())
+		return s.but().Pick(ctx, req.Sources, req.Placement.toBut())
 	})
 }
 
@@ -394,7 +394,7 @@ func (s *Server) opApply(w http.ResponseWriter, r *http.Request) {
 		if err := required(req.Branch != "", "branch is required"); err != nil {
 			return err
 		}
-		return s.client.Apply(ctx, req.Branch)
+		return s.but().Apply(ctx, req.Branch)
 	})
 }
 
@@ -403,7 +403,7 @@ func (s *Server) opUnapply(w http.ResponseWriter, r *http.Request) {
 		if err := required(req.Branch != "", "branch is required"); err != nil {
 			return err
 		}
-		return s.client.Unapply(ctx, req.Branch)
+		return s.but().Unapply(ctx, req.Branch)
 	})
 }
 
@@ -412,23 +412,23 @@ func (s *Server) opPush(w http.ResponseWriter, r *http.Request) {
 		if err := required(req.Branch != "", "branch is required"); err != nil {
 			return err
 		}
-		return s.syncPRs(ctx, s.client.Push(ctx, req.Branch, req.Force))
+		return s.syncPRs(ctx, s.but().Push(ctx, req.Branch, req.Force))
 	})
 }
 
 func (s *Server) opPull(w http.ResponseWriter, r *http.Request) {
-	decodeAndRun(s, w, r, func(ctx context.Context, _ noBody) error { return s.client.Pull(ctx) })
+	decodeAndRun(s, w, r, func(ctx context.Context, _ noBody) error { return s.but().Pull(ctx) })
 }
 
 func (s *Server) opUndo(w http.ResponseWriter, r *http.Request) {
 	decodeAndRunOut(s, w, r, func(ctx context.Context, _ noBody) (string, error) {
-		return s.client.Exec(ctx, "undo")
+		return s.but().Exec(ctx, "undo")
 	})
 }
 
 func (s *Server) opRedo(w http.ResponseWriter, r *http.Request) {
 	decodeAndRunOut(s, w, r, func(ctx context.Context, _ noBody) (string, error) {
-		return s.client.Exec(ctx, "redo")
+		return s.but().Exec(ctx, "redo")
 	})
 }
 
@@ -437,7 +437,7 @@ func (s *Server) opPRNew(w http.ResponseWriter, r *http.Request) {
 		if err := required(req.Branch != "", "branch is required"); err != nil {
 			return err
 		}
-		return s.syncPRs(ctx, s.client.PRNew(ctx, req.Branch, req.Message, req.Draft))
+		return s.syncPRs(ctx, s.but().PRNew(ctx, req.Branch, req.Message, req.Draft))
 	})
 }
 
@@ -446,7 +446,7 @@ func (s *Server) opOplogRestore(w http.ResponseWriter, r *http.Request) {
 		if err := required(req.Snapshot != "", "snapshot is required"); err != nil {
 			return err
 		}
-		return s.client.OplogRestore(ctx, req.Snapshot)
+		return s.but().OplogRestore(ctx, req.Snapshot)
 	})
 }
 
@@ -456,13 +456,13 @@ func (s *Server) opLand(w http.ResponseWriter, r *http.Request) {
 		if err := required(req.Branch != "", "branch is required"); err != nil {
 			return "", err
 		}
-		return s.client.Exec(ctx, "land", req.Branch, "--yes")
+		return s.but().Exec(ctx, "land", req.Branch, "--yes")
 	})
 }
 
 func (s *Server) opClean(w http.ResponseWriter, r *http.Request) {
 	decodeAndRunOut(s, w, r, func(ctx context.Context, _ noBody) (string, error) {
-		return s.client.Exec(ctx, "clean")
+		return s.but().Exec(ctx, "clean")
 	})
 }
 
@@ -471,17 +471,17 @@ func (s *Server) opResolveStart(w http.ResponseWriter, r *http.Request) {
 		if err := required(req.Commit != "", "commit is required"); err != nil {
 			return err
 		}
-		return s.client.ResolveStart(ctx, req.Commit)
+		return s.but().ResolveStart(ctx, req.Commit)
 	})
 }
 
 func (s *Server) opResolveFinish(w http.ResponseWriter, r *http.Request) {
-	decodeAndRun(s, w, r, func(ctx context.Context, _ noBody) error { return s.client.ResolveFinish(ctx) })
+	decodeAndRun(s, w, r, func(ctx context.Context, _ noBody) error { return s.but().ResolveFinish(ctx) })
 }
 
 func (s *Server) opResolveCancel(w http.ResponseWriter, r *http.Request) {
 	decodeAndRun(s, w, r, func(ctx context.Context, req forceReq) error {
-		return s.client.ResolveCancel(ctx, req.Force)
+		return s.but().ResolveCancel(ctx, req.Force)
 	})
 }
 
@@ -499,7 +499,7 @@ func (s *Server) exec(w http.ResponseWriter, r *http.Request) {
 		if err := required(len(args) > 0, "a command is required"); err != nil {
 			return "", err
 		}
-		return s.client.Exec(ctx, args...)
+		return s.but().Exec(ctx, args...)
 	})
 }
 
@@ -507,7 +507,7 @@ func (s *Server) exec(w http.ResponseWriter, r *http.Request) {
 // the next workspace read shows them. A failed sync is not reported: the operation worked.
 func (s *Server) syncPRs(ctx context.Context, err error) error {
 	if err == nil {
-		_, _ = s.client.SyncedStatus(ctx)
+		_, _ = s.but().SyncedStatus(ctx)
 	}
 	return err
 }

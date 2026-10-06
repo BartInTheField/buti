@@ -56,7 +56,7 @@ func (s *Server) repoPath(p string) (string, error) {
 	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
 		return "", badRequestError{msg: "path must stay inside the repository"}
 	}
-	root, err := filepath.Abs(s.client.Dir)
+	root, err := filepath.Abs(s.but().Dir)
 	if err != nil {
 		return "", err
 	}

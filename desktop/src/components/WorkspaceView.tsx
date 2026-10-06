@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type MouseEvent } from "react"
+import { useRef, useState, type MouseEvent } from "react"
 import {
   DndContext,
   DragOverlay,
@@ -50,6 +50,7 @@ import { BranchesLayer, HistoryButtons, UpstreamButton } from "./branches/Branch
 import { DetailsLayout } from "./details/DetailsLayout"
 import { BrandLogo } from "./BrandMark"
 import { DiffPane } from "./DiffPane"
+import { RepoMenu } from "./RepoMenu"
 import { cancelTarget } from "./target/store"
 import { TargetModeProvider } from "./target/TargetModeProvider"
 import { StackLanes } from "./StackLanes"
@@ -105,11 +106,6 @@ function WorkspaceScreen({
   const diff = useDiff(ops.cfg.url, ops.cfg.token, selectionDiffId(sel.selection))
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
-
-  const repoName = useMemo(
-    () => workspace.repo.split(/[/\\]/).filter(Boolean).pop() ?? workspace.repo,
-    [workspace.repo],
-  )
 
   function onItemClick(item: Selection, e: MouseEvent) {
     if (e.metaKey || e.ctrlKey) {
@@ -174,7 +170,9 @@ function WorkspaceScreen({
         <div className="flex min-w-0 items-center gap-3">
           <BrandLogo />
           <span className="h-4 w-px shrink-0 bg-border" aria-hidden="true" />
-          <h1 className="truncate font-heading text-sm font-medium tracking-tight">{repoName}</h1>
+          <h1 className="flex min-w-0">
+            <RepoMenu dir={workspace.repo} />
+          </h1>
         </div>
         <div className="flex items-center gap-2">
           {marked > 0 ? (

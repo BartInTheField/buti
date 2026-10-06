@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/bartinthefield/buti/internal/but"
@@ -29,9 +30,12 @@ type Server struct {
 	URL   string
 	Token string
 
-	client *but.Client
+	// client is swapped by POST /repo; read it with but().
+	client atomic.Pointer[but.Client]
 	http   *http.Server
 	host   string // host:port the listener accepted, required on the Host header
+	// chosen is whether the repository was asked for: -C, or POST /repo. Not just the working directory.
+	chosen atomic.Bool
 }
 
 // Start listens on 127.0.0.1 and port (0 picks a free port) and serves until Shutdown.
@@ -52,15 +56,17 @@ func Start(client *but.Client, port int) (*Server, error) {
 	}
 	host := ln.Addr().String()
 	s := &Server{
-		URL:    "http://" + host,
-		Token:  token,
-		client: client,
-		host:   host,
+		URL:   "http://" + host,
+		Token: token,
+		host:  host,
 	}
+	s.client.Store(client)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("GET /status", s.status)
 	mux.HandleFunc("GET /workspace", s.workspace)
+	mux.HandleFunc("GET /repo", s.repo)
+	mux.HandleFunc("POST /repo", s.openRepo)
 	mux.HandleFunc("GET /diff", s.diff)
 	mux.HandleFunc("POST /ops/commit", s.opCommit)
 	mux.HandleFunc("POST /ops/amend", s.opAmend)
@@ -238,7 +244,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "missing or invalid token", "")
 		return
 	}
-	st, err := s.client.Status(r.Context())
+	st, err := s.but().Status(r.Context())
 	if err != nil {
 		status, code, msg, docs := classifyBut(err)
 		writeError(w, status, code, msg, docs)
@@ -247,7 +253,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, struct {
 		OK      bool    `json:"ok"`
 		Summary Summary `json:"summary"`
-	}{OK: true, Summary: summarize(s.client.Dir, st)})
+	}{OK: true, Summary: summarize(s.but().Dir, st)})
 }
 
 func bearerOK(r *http.Request, token string) bool {

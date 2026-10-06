@@ -276,6 +276,22 @@ export async function openFiles(cfg: ApiConfig, paths: string[], editor = false)
   await postOp(cfg, "/open", { paths, editor })
 }
 
+export type Repo = {
+  dir: string
+  /** False when `buti desktop` ran without -C and no folder was opened since: the window may reopen the last one. */
+  chosen: boolean
+}
+
+export async function fetchRepo(cfg: ApiConfig): Promise<Repo> {
+  const { dir, chosen } = await getJSON<{ ok: true } & Repo>(cfg, "/repo")
+  return { dir, chosen }
+}
+
+/** openRepo points the API at another repository; it fails, and keeps the current one, when `but status` fails there. */
+export async function openRepo(cfg: ApiConfig, dir: string): Promise<void> {
+  await postOp(cfg, "/repo", { dir })
+}
+
 export type SquashMode = "combine" | "target" | "source"
 
 /**

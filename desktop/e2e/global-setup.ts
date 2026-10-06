@@ -59,7 +59,9 @@ export function waitFor(proc: ChildProcess, stream: "stdout" | "stderr", re: Reg
  */
 export async function serve(opts: {
   bin: string
-  repo: string
+  /** The repository (-C). Without it the API starts in cwd, as a window launched without -C does. */
+  repo?: string
+  cwd?: string
   env: Record<string, string>
   vitePort: number
   apiPort?: number
@@ -68,7 +70,9 @@ export async function serve(opts: {
   const procs: ChildProcess[] = []
   const stop = () => procs.forEach((p) => p.kill())
   try {
-    const api = spawn(opts.bin, ["-C", opts.repo, "desktop", "--serve", "--port", String(opts.apiPort ?? 0)], {
+    const dirArgs = opts.repo ? ["-C", opts.repo] : []
+    const api = spawn(opts.bin, [...dirArgs, "desktop", "--serve", "--port", String(opts.apiPort ?? 0)], {
+      cwd: opts.cwd,
       env: {
         ...process.env,
         ...opts.env,

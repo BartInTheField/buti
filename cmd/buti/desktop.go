@@ -15,8 +15,8 @@ import (
 
 // runDesktop starts the loopback API and the Tauri shell.
 // `but` is not required to be on PATH here: a missing CLI is reported by GET /status
-// so the window can show it.
-func runDesktop(dir string, args []string, stdout, stderr io.Writer) int {
+// so the window can show it. Without -C (dirChosen false) the window may reopen the last repository.
+func runDesktop(dir string, dirChosen bool, args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("buti desktop", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	serve := fs.Bool("serve", false, "serve the local API and wait; do not open a window")
@@ -44,6 +44,7 @@ func runDesktop(dir string, args []string, stdout, stderr io.Writer) int {
 	defer stop()
 	err := desktop.Run(ctx, desktop.Config{
 		Dir:        dir,
+		DirChosen:  dirChosen,
 		Port:       *port,
 		ServeOnly:  *serve,
 		Dev:        *dev,
