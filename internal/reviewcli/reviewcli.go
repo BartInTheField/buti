@@ -412,12 +412,7 @@ func commitTitle(st *but.Status, commitID string) string {
 }
 
 func fileDiff(d *but.Diff, path string) *but.FileDiff {
-	for i := range d.Changes {
-		if d.Changes[i].Path == path {
-			return &d.Changes[i]
-		}
-	}
-	return nil
+	return d.File(path)
 }
 
 // cachingDiffer remembers the diffs it fetched, so the context reuses the diffs re-anchoring already read.

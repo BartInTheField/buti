@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 )
@@ -184,6 +185,25 @@ type FileDiff struct {
 
 type Diff struct {
 	Changes []FileDiff `json:"changes"`
+}
+
+// File is the diff of path with every hunk, nil when d has none. An uncommitted diff lists one entry per hunk, so
+// the first entry for a path holds only its first hunk; File merges them.
+func (d *Diff) File(path string) *FileDiff {
+	var out *FileDiff
+	for i := range d.Changes {
+		fd := d.Changes[i]
+		if fd.Path != path {
+			continue
+		}
+		if out == nil {
+			out = &fd
+			out.Diff.Hunks = slices.Clone(fd.Diff.Hunks)
+			continue
+		}
+		out.Diff.Hunks = append(out.Diff.Hunks, fd.Diff.Hunks...)
+	}
+	return out
 }
 
 // Diff returns the structured diff for a CLI id (file, commit or branch), or of

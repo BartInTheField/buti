@@ -435,13 +435,7 @@ func (l *locator) fileDiff(fileID, path string) (*but.FileDiff, error) {
 	if err != nil {
 		return nil, fmt.Errorf("diff of %s: %w", path, err)
 	}
-	var fd *but.FileDiff
-	for i := range d.Changes {
-		if d.Changes[i].Path == path {
-			fd = &d.Changes[i]
-			break
-		}
-	}
+	fd := d.File(path)
 	l.diffs[fileID] = fd
 	return fd, nil
 }
