@@ -21,7 +21,7 @@ export function humanizeOp(s: string): string {
   return s.replace(/(?!^)([A-Z])/g, (c) => ` ${c.toLowerCase()}`)
 }
 
-/** pushState describes a branch's push status for its badge (internal/ui branchColor). */
+/** pushState describes a branch's push status for its badge; its colors follow internal/ui branchColor. */
 export function pushState(status?: string): { label: string; tip: string; tone: "local" | "ahead" | "force" | "pushed" | "integrated" } | null {
   switch (status) {
     case "completelyUnpushed":

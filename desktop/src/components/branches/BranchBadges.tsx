@@ -1,17 +1,23 @@
 import { CloudIcon, CloudOffIcon, CloudUploadIcon, GitMergeIcon, GitPullRequestIcon, TriangleAlertIcon } from "lucide-react"
 import { branchPR, type Branch } from "@/api"
-import { Badge, type BadgeProps } from "@/components/reui/badge"
+import { cn } from "cn"
+import { Badge } from "@/components/reui/badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { pushState } from "./format"
 
-/** The ReUI light variant for each push state: neutral, then warning, danger, done. */
-const toneVariant = {
-  local: "outline",
-  ahead: "warning-light",
-  force: "destructive-light",
-  pushed: "success-light",
-  integrated: "primary-light",
-} as const satisfies Record<string, BadgeProps["variant"]>
+/**
+ * The color of each push state, matching branchColor in internal/ui/styles.go: grey while
+ * local, yellow with commits to push (diverged too: it needs a force push, it isn't an
+ * error), teal once pushed, the accent once integrated. In dark mode teal-400 and
+ * yellow-400 are the TUI's exact colors; light mode darkens the text to stay readable.
+ */
+const toneClass = {
+  local: "text-muted-foreground",
+  ahead: "border-yellow-500/30 bg-yellow-400/15 text-yellow-700 dark:border-yellow-400/25 dark:text-yellow-400",
+  force: "border-yellow-500/30 bg-yellow-400/15 text-yellow-700 dark:border-yellow-400/25 dark:text-yellow-400",
+  pushed: "border-teal-500/30 bg-teal-400/15 text-teal-700 dark:border-teal-400/25 dark:text-teal-400",
+  integrated: "border-primary/25 bg-primary/15 text-primary",
+} as const
 
 const toneIcon = {
   local: CloudOffIcon,
@@ -46,9 +52,9 @@ export function BranchBadges({ branch }: { branch: Branch }) {
         <Tooltip>
           <TooltipTrigger asChild>
             <Badge
-              variant={toneVariant[push.tone]}
+              variant="outline"
               size="sm"
-              className={push.tone === "local" ? "max-w-24 text-muted-foreground" : "max-w-24"}
+              className={cn("max-w-24", toneClass[push.tone])}
               data-testid="push-badge"
             >
               <PushIcon />
