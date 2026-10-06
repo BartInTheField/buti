@@ -115,6 +115,8 @@ The window loads `GET /workspace` with [TanStack Query](https://tanstack.com/que
 
 `GET /status` still returns the spike summary for curl and older callers.
 
+![Workspace: Unstaged, stack lanes, and diff](images/desktop/workspace.png)
+
 ## Tests
 
 The Go API is covered by `go test ./internal/desktop` and does not need Node, Rust, or `but`. `mise run test` includes it. The Tauri window is not in CI.
