@@ -409,7 +409,58 @@ export function DiffPane({ selection, diff, loading, stale, error }: Props) {
     const sameHunk = curRow?.type === "line" && curRow.hunk === r.hunk
     if (anc >= 0 && !sameHunk) setAnchor(null)
     if (e.shiftKey && anc < 0 && sameHunk && curRow) setAnchor(curRow.key)
+    if (e.button === 0 && !e.shiftKey) {
+      // A plain press starts a drag: moving onto other lines selects the range, like `v`.
+      e.preventDefault() // the line range replaces the browser's text selection
+      setAnchor(null)
+      dragRef.current = { start: i, at: i, hunk: r.hunk, ranged: false }
+    }
     setCursor({ key: r.key })
+  }
+
+  /** The line nearest to row i, walking back towards the drag start, in the drag's hunk. */
+  function dragLine(i: number, d: { start: number; hunk: number }): number {
+    const step = i > d.start ? -1 : 1
+    for (let j = i; j !== d.start; j += step) {
+      const r = rows[j]
+      if (r?.type === "line" && r.hunk === d.hunk && r.sign !== "\\") return j
+    }
+    return d.start
+  }
+
+  function onRowMouseEnter(i: number) {
+    const d = dragRef.current
+    if (!d) return
+    const j = dragLine(i, d)
+    if (j === d.at) return
+    d.at = j
+    if (!d.ranged) {
+      d.ranged = true
+      setAnchor(rows[d.start].key)
+    }
+    setCursor({ key: rows[j].key })
+  }
+
+  const dragRef = useRef<{ start: number; at: number; hunk: number; ranged: boolean } | null>(null)
+  useEffect(() => {
+    const end = () => {
+      const d = dragRef.current
+      dragRef.current = null
+      // Dragging back onto the start line is a click, not a one-line range.
+      if (d?.ranged && d.at === d.start) setAnchor(null)
+    }
+    window.addEventListener("mouseup", end)
+    return () => window.removeEventListener("mouseup", end)
+  }, [])
+
+  // While dragging a range, holding the pointer near the top or bottom edge scrolls the diff.
+  function onScrollMouseMove(e: MouseEvent) {
+    const el = scrollRef.current
+    if (!dragRef.current || !el || e.buttons !== 1) return
+    const box = el.getBoundingClientRect()
+    const edge = 24
+    if (e.clientY < box.top + edge) el.scrollTop -= edge
+    else if (e.clientY > box.bottom - edge) el.scrollTop += edge
   }
 
   const anchorRef = useRef({
@@ -451,6 +502,7 @@ export function DiffPane({ selection, diff, loading, stale, error }: Props) {
           aria-label="Diff"
           className="min-h-0 flex-1 overflow-auto outline-none [contain:strict]"
           onKeyDown={onKeyDown}
+          onMouseMove={onScrollMouseMove}
           onFocus={() => setFocused(true)}
           onBlur={(e) => {
             const to = e.relatedTarget as HTMLElement | null
@@ -489,6 +541,7 @@ export function DiffPane({ selection, diff, loading, stale, error }: Props) {
                     className="absolute top-0 left-0 w-full"
                     style={{ transform: `translateY(${item.start}px)`, height: r.type === "note" ? undefined : item.size }}
                     onMouseDown={(e) => onRowMouseDown(item.index, e)}
+                    onMouseEnter={() => onRowMouseEnter(item.index)}
                   >
                     <RowView
                       row={r}

@@ -89,6 +89,23 @@ test("diff is highlighted, and the line cursor moves with keys and clicks", asyn
   await page.screenshot({ path: `${shots}/range.png` })
   await page.keyboard.press("Escape")
   await expect(pane(page).locator("[data-range]")).toHaveCount(0)
+
+  // Dragging with the mouse selects the lines it covers, like v.
+  const lines = page.getByTestId("diff-line")
+  const from = (await lines.nth(2).boundingBox())!
+  const to = (await lines.nth(5).boundingBox())!
+  await page.mouse.move(from.x + 80, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(to.x + 80, to.y + to.height / 2, { steps: 6 })
+  await page.mouse.up()
+  await expect(pane(page).locator("[data-range]")).toHaveCount(4)
+  await expect(cursorLine(page)).toBeVisible()
+  expect(await page.getByTestId("diff-line").first().boundingBox()).toEqual(before)
+  await settle(page)
+  await page.screenshot({ path: `${shots}/range-drag.png` })
+  // A plain click afterwards is a single line again.
+  await lines.nth(3).click()
+  await expect(pane(page).locator("[data-range]")).toHaveCount(0)
 })
 
 test("the first diff load shows a skeleton in the diff's shape", async ({ page }) => {
@@ -321,6 +338,10 @@ test("full screen with the file tree, T hides it, esc leaves; d hides the pane",
   await expect(page.getByTestId("branch-card").first()).not.toBeInViewport()
   await tree.getByTestId("tree-file").filter({ hasText: "strings.go" }).click()
   await expect(cursorLine(page)).toContainText("package util")
+  // A shift-click on another file must not select the file names as text.
+  await tree.getByTestId("tree-file").first().click({ modifiers: ["Shift"] })
+  expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("")
+  await expect(tree).toHaveCSS("user-select", "none")
   await settle(page)
   await page.screenshot({ path: `${shots}/full-screen.png` })
   // Folding a directory.
