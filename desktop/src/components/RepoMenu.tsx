@@ -1,4 +1,4 @@
-import { CheckIcon, ChevronDownIcon, FolderOpenIcon } from "lucide-react"
+import { CheckIcon, ChevronsUpDownIcon, FolderGit2Icon, FolderOpenIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -25,20 +25,22 @@ export function RepoMenu({ dir }: { dir: string }) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="-ml-2 h-auto min-w-0 shrink justify-start gap-1 px-2 py-0.5"
+          size="sm"
+          className="-ml-1 min-w-0 shrink justify-start gap-1.5 px-1.5"
           disabled={repos.switching}
           title={dir}
           data-testid="repo-menu"
         >
+          <FolderGit2Icon className="text-muted-foreground" aria-hidden="true" />
           <span className="truncate font-heading text-sm font-medium tracking-tight">{repoName(dir)}</span>
-          <ChevronDownIcon className="text-muted-foreground" />
+          <ChevronsUpDownIcon className="text-muted-foreground/70" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-80">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Current</DropdownMenuLabel>
           <DropdownMenuItem disabled className="data-disabled:opacity-100">
-            <CheckIcon />
+            <CheckIcon className="text-primary" />
             <RepoLabel dir={dir} />
           </DropdownMenuItem>
         </DropdownMenuGroup>
@@ -69,9 +71,11 @@ export function RepoMenu({ dir }: { dir: string }) {
 
 function RepoLabel({ dir }: { dir: string }) {
   return (
-    <span className="flex min-w-0 flex-col">
-      <span className="truncate">{repoName(dir)}</span>
-      <span className="truncate font-mono text-xs text-muted-foreground">{dir}</span>
+    <span className="flex min-w-0 flex-col gap-0.5">
+      <span className="truncate font-medium">{repoName(dir)}</span>
+      <span className="truncate font-mono text-[11px] text-muted-foreground" title={dir}>
+        {dir}
+      </span>
     </span>
   )
 }

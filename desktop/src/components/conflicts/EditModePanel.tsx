@@ -1,8 +1,18 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { CheckIcon, ExternalLinkIcon, FileIcon, XIcon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import {
+  CheckIcon,
+  ExternalLinkIcon,
+  FileIcon,
+  GitCommitVerticalIcon,
+  InfoIcon,
+  TriangleAlertIcon,
+  XIcon,
+} from "lucide-react"
+import { Alert, AlertDescription } from "@/components/reui/alert"
+import { Badge } from "@/components/reui/badge"
+import { Frame, FrameHeader, FramePanel, FrameTitle } from "@/components/reui/frame"
+import { IconTile } from "@/components/reui/icon-tile"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { Kbd } from "@/components/ui/kbd"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -46,55 +56,68 @@ export function EditModePanel({ workspace, cfg }: { workspace: Workspace; cfg: A
         <ResizablePanel defaultSize="40" minSize="25">
           <ScrollArea className="h-full">
             <div className="flex flex-col gap-4 p-5">
-              <div>
-                <h2 className="font-heading text-lg font-medium tracking-tight">
-                  {editing ? (
-                    <>
-                      You are editing commit{" "}
-                      <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">{editing.shortId}</code>
-                    </>
-                  ) : (
-                    "You are editing a conflicted commit"
-                  )}
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Fix the files in your editor; this view updates as their markers go.
-                </p>
+              <div className="flex items-start gap-3">
+                <IconTile variant="soft" size="sm" className="text-destructive">
+                  <GitCommitVerticalIcon />
+                </IconTile>
+                <div className="min-w-0">
+                  <h2 className="font-heading text-lg leading-8 font-medium tracking-tight">
+                    {editing ? (
+                      <>
+                        You are editing commit{" "}
+                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">{editing.shortId}</code>
+                      </>
+                    ) : (
+                      "You are editing a conflicted commit"
+                    )}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Fix the files in your editor; this view updates as their markers go.
+                  </p>
+                </div>
               </div>
 
-              {editing ? (
-                <Card className="gap-1 px-4 py-3" data-testid="edited-commit">
-                  <p className="truncate text-sm font-medium">{editing.subject}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {editing.shortId}
-                    {editing.author ? ` · ${editing.author}` : ""}
-                  </p>
-                </Card>
-              ) : null}
-
-              <Card className="gap-0 py-2">
-                <div className="flex items-center gap-2 px-4 py-1.5">
-                  <span className="text-sm font-medium">Commit files</span>
-                  <Badge variant="secondary" className="tabular-nums">
+              <Frame spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
+                {editing ? (
+                  <FramePanel className="flex flex-col gap-0.5 py-2.5" data-testid="edited-commit">
+                    <p className="truncate text-sm font-medium">{editing.subject}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      <span className="font-mono">{editing.shortId}</span>
+                      {editing.author ? ` · ${editing.author}` : ""}
+                    </p>
+                  </FramePanel>
+                ) : null}
+                <FrameHeader className="flex-row items-center gap-2">
+                  <FrameTitle>Commit files</FrameTitle>
+                  <Badge variant="outline" size="sm" className="tabular-nums">
                     {files.length}
                   </Badge>
-                </div>
-                <ul className="flex flex-col gap-0.5 px-2 pt-1">
-                  {files.map((f) => (
-                    <FileRow
-                      key={f.path}
-                      file={f}
-                      selected={current?.path === f.path}
-                      onSelect={() => selectConflictFile(f.path)}
-                      onOpen={() => void openConflictFile(actions.contextFor(), f.path)}
-                    />
-                  ))}
-                </ul>
-              </Card>
+                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                    {left === 0 ? "All resolved" : `${left} left`}
+                  </span>
+                </FrameHeader>
+                <FramePanel className="p-1">
+                  <ul className="flex flex-col gap-0.5">
+                    {files.map((f) => (
+                      <FileRow
+                        key={f.path}
+                        file={f}
+                        selected={current?.path === f.path}
+                        onSelect={() => selectConflictFile(f.path)}
+                        onOpen={() => void openConflictFile(actions.contextFor(), f.path)}
+                      />
+                    ))}
+                  </ul>
+                </FramePanel>
+              </Frame>
 
-              <p className="text-xs text-muted-foreground">
-                To exit edit mode, save and exit or cancel. Your uncommitted changes come back afterwards.
-              </p>
+              {/* An opaque tint: a translucent fill under the translucent border fringes the corners. */}
+              <Alert variant="info" role="note" className="bg-[color-mix(in_oklab,var(--info)_4%,var(--background))]">
+                <InfoIcon />
+                <AlertDescription className="text-xs">
+                  To exit edit mode, save and exit or cancel. Your uncommitted changes come back afterwards.
+                </AlertDescription>
+              </Alert>
 
               <div className="flex flex-wrap justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => runAction("conflict.cancel")}>
@@ -165,9 +188,13 @@ function FileRow({
           {dir ? <span className="ml-2 text-muted-foreground">{dir}</span> : null}
         </span>
         {file.resolved ? (
-          <Badge className="shrink-0 bg-emerald-600 text-white dark:bg-emerald-500">Resolved</Badge>
+          <Badge variant="success-light" size="sm">
+            <CheckIcon />
+            Resolved
+          </Badge>
         ) : (
-          <Badge variant="destructive" className="shrink-0">
+          <Badge variant="destructive-light" size="sm">
+            <TriangleAlertIcon />
             Conflicted
           </Badge>
         )}

@@ -1,5 +1,7 @@
-import { FolderOpenIcon, XIcon } from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ChevronRightIcon, CircleAlertIcon, FolderGit2Icon, FolderOpenIcon, XIcon } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Frame, FrameHeader, FramePanel, FrameTitle } from "@/components/reui/frame"
+import { IconTile } from "@/components/reui/icon-tile"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { toastError } from "@/actions/toast"
@@ -19,6 +21,7 @@ export function RepoPicker({ error }: { error?: { title: string; message: string
     <div className="flex flex-col gap-6" data-testid="repo-picker">
       {error ? (
         <Alert variant="destructive">
+          <CircleAlertIcon />
           <AlertTitle>{error.title}</AlertTitle>
           <AlertDescription>
             {repos.dir ? <p className="font-mono text-xs break-all">{repos.dir}</p> : null}
@@ -27,53 +30,68 @@ export function RepoPicker({ error }: { error?: { title: string; message: string
         </Alert>
       ) : null}
 
-      <section className="flex flex-col gap-3">
-        <div>
-          <h2 className="font-heading text-lg font-medium">Open a repository</h2>
-          <p className="text-sm text-muted-foreground">
-            Choose a folder with a GitButler workspace. Run <code>but setup</code> in a git repository to make one.
+      <section className="flex flex-col items-center gap-4 text-center">
+        <IconTile variant="frame" size="xl" aria-hidden="true">
+          <FolderGit2Icon className="text-primary" />
+        </IconTile>
+        <div className="flex max-w-sm flex-col gap-1">
+          <h2 className="font-heading text-lg font-medium tracking-tight">Open a repository</h2>
+          <p className="text-sm text-balance text-muted-foreground">
+            Choose a folder with a GitButler workspace. Run{" "}
+            <code className="rounded-sm bg-muted px-1 py-0.5 font-mono text-xs text-foreground">but setup</code> in a
+            git repository to make one.
           </p>
         </div>
-        <div>
-          <Button
-            onClick={() => void repos.choose().catch(toastError)}
-            disabled={repos.switching}
-          >
-            <FolderOpenIcon />
-            Choose folder…
-            <Kbd className="bg-primary-foreground/15 text-primary-foreground">{formatKey("mod+o")}</Kbd>
-          </Button>
-        </div>
+        <Button onClick={() => void repos.choose().catch(toastError)} disabled={repos.switching}>
+          <FolderOpenIcon />
+          Choose folder…
+          <Kbd className="-mr-1 bg-primary-foreground/15 text-primary-foreground">{formatKey("mod+o")}</Kbd>
+        </Button>
       </section>
 
       {recent.length > 0 ? (
-        <section className="flex flex-col gap-2">
-          <h3 className="text-xs font-medium text-muted-foreground">Recent</h3>
-          <ul className="flex flex-col divide-y rounded-lg border" data-testid="recent-repos">
-            {recent.map((dir) => (
-              <li key={dir} className="group flex items-center">
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 flex-col items-start px-3 py-2 text-left hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none disabled:opacity-50"
-                  disabled={repos.switching}
-                  onClick={() => void repos.open(dir).catch(toastError)}
-                >
-                  <span className="text-sm font-medium">{repoName(dir)}</span>
-                  <span className="max-w-full truncate font-mono text-xs text-muted-foreground">{dir}</span>
-                </button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="mr-2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                  aria-label={`Remove ${repoName(dir)} from recent`}
-                  onClick={() => repos.forget(dir)}
-                >
-                  <XIcon />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <Frame stacked spacing="xs">
+          <FrameHeader>
+            <FrameTitle className="text-xs font-medium text-muted-foreground">Recent</FrameTitle>
+          </FrameHeader>
+          <FramePanel className="p-0">
+            <ul className="flex flex-col divide-y" data-testid="recent-repos">
+              {recent.map((dir) => (
+                <li key={dir} className="group relative flex items-center">
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none disabled:opacity-50"
+                    disabled={repos.switching}
+                    onClick={() => void repos.open(dir).catch(toastError)}
+                  >
+                    <IconTile variant="outline" size="sm" aria-hidden="true">
+                      <FolderGit2Icon className="text-muted-foreground" />
+                    </IconTile>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="text-sm font-medium">{repoName(dir)}</span>
+                      <span className="truncate font-mono text-xs text-muted-foreground" title={dir}>
+                        {dir}
+                      </span>
+                    </span>
+                    <ChevronRightIcon
+                      className="size-4 shrink-0 text-muted-foreground/60 group-hover:opacity-0"
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="absolute right-2.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    aria-label={`Remove ${repoName(dir)} from recent`}
+                    onClick={() => repos.forget(dir)}
+                  >
+                    <XIcon />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </FramePanel>
+        </Frame>
       ) : null}
     </div>
   )

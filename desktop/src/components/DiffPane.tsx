@@ -4,21 +4,29 @@ import { usePanelRef } from "react-resizable-panels"
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  CircleAlertIcon,
   EyeIcon,
   EyeOffIcon,
+  FileCodeIcon,
+  GitBranchIcon,
+  GitCommitHorizontalIcon,
+  LayersIcon,
   ListTreeIcon,
   Maximize2Icon,
   MessageSquareIcon,
   Minimize2Icon,
+  MousePointerClickIcon,
   XIcon,
 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/reui/alert"
+import { Badge } from "@/components/reui/badge"
+import { IconTile } from "@/components/reui/icon-tile"
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
+import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
@@ -34,6 +42,8 @@ import { isOpen, useComments, type LocatedComment } from "./review/api"
 import { moveToLines } from "./review/locate"
 import { DiffContextMenu } from "./details/DiffContextMenu"
 import { FileTree } from "./details/FileTree"
+import { HintButton } from "./details/HintButton"
+import { PathLabel, StatusBadge } from "./details/StatusBadge"
 import { useHighlight, type Highlighted } from "./details/highlight"
 import {
   expandTabs,
@@ -478,6 +488,7 @@ export function DiffPane({ selection, diff, loading, stale, error }: Props) {
   }
 
   const openCount = notes.filter(isOpen).length
+  const stats = useMemo(() => diffStats(base), [base])
   const activeFile = layout ? fileAt(layout, virt.range?.startIndex ?? 0) : ""
   const treeShown = view.full && view.tree && layout !== null && layout.files.length > 0
   const gutterCh = (layout?.numW ?? 1) * 2 + 3
@@ -513,10 +524,20 @@ export function DiffPane({ selection, diff, loading, stale, error }: Props) {
           }}
         >
           {selection === null ? (
-            <p className="p-3 text-sm text-muted-foreground">Select something in the workspace to see its diff.</p>
+            <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+              <IconTile variant="frame" size="sm" className="text-muted-foreground">
+                <MousePointerClickIcon />
+              </IconTile>
+              <p className="text-sm text-muted-foreground">Select something in the workspace to see its diff.</p>
+            </div>
           ) : null}
           {loading && !diff ? <DiffSkeleton /> : null}
-          {error ? <p className="p-3 text-sm text-destructive">{error}</p> : null}
+          {error ? (
+            <Alert variant="destructive" className="m-3 w-auto">
+              <CircleAlertIcon />
+              <AlertDescription className="text-destructive">{error}</AlertDescription>
+            </Alert>
+          ) : null}
           {layout ? (
             <div
               className={cn("relative font-mono text-xs transition-opacity", stale && "opacity-60")}
@@ -589,48 +610,77 @@ export function DiffPane({ selection, diff, loading, stale, error }: Props) {
 
   return (
     <div className="flex h-full min-h-0 flex-col border-t bg-background" data-testid="diff-pane">
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b px-3">
-        <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{selectionTitle(selection)}</h2>
+      <div className="flex h-10 shrink-0 items-center gap-1.5 border-b bg-muted/30 pr-1.5 pl-3">
+        <SelectionIcon selection={selection} />
+        <h2 className="min-w-0 truncate text-sm font-medium">{selectionTitle(selection)}</h2>
+        {stats.files > 0 ? (
+          <span className="flex shrink-0 items-center gap-1" data-testid="diff-stats">
+            {stats.files > 1 ? (
+              <span className="text-xs text-muted-foreground tabular-nums">{stats.files} files</span>
+            ) : null}
+            {stats.added > 0 ? (
+              <Badge size="sm" variant="success-light" className="font-mono tabular-nums">
+                +{stats.added}
+              </Badge>
+            ) : null}
+            {stats.removed > 0 ? (
+              <Badge size="sm" variant="destructive-light" className="font-mono tabular-nums">
+                −{stats.removed}
+              </Badge>
+            ) : null}
+          </span>
+        ) : null}
         {/* Reserved space, so the spinner appearing never shifts the title. */}
-        <span className="size-4 shrink-0">{stale || loading ? <Spinner /> : null}</span>
+        <span className="size-4 shrink-0 text-muted-foreground">{stale || loading ? <Spinner /> : null}</span>
+        <span className="flex-1" />
         <Badge
-          variant="outline"
+          variant="warning-light"
           className={cn("gap-1 tabular-nums", openCount === 0 && "invisible")}
           data-testid="open-comments"
+          title="Open review comments"
         >
-          <MessageSquareIcon className="size-3" />
+          <MessageSquareIcon />
           {openCount}
         </Badge>
-        <PaneButton label="Previous hunk ([)" onClick={() => stepHunk(-1)} disabled={!layout?.hunks.length}>
+        <HintButton label="Previous hunk" hint="[" onClick={() => stepHunk(-1)} disabled={!layout?.hunks.length}>
           <ChevronUpIcon />
-        </PaneButton>
-        <PaneButton label="Next hunk (])" onClick={() => stepHunk(1)} disabled={!layout?.hunks.length}>
+        </HintButton>
+        <HintButton label="Next hunk" hint="]" onClick={() => stepHunk(1)} disabled={!layout?.hunks.length}>
           <ChevronDownIcon />
-        </PaneButton>
-        <PaneButton
-          label={view.hideResolved ? "Show resolved comments (z)" : "Hide resolved comments (z)"}
+        </HintButton>
+        <Separator orientation="vertical" className="mx-0.5 my-2.5" />
+        <HintButton
+          label={view.hideResolved ? "Show resolved comments" : "Hide resolved comments"}
+          hint="z"
           onClick={() => setDetailsView((v) => ({ hideResolved: !v.hideResolved }))}
           pressed={view.hideResolved}
         >
           {view.hideResolved ? <EyeOffIcon /> : <EyeIcon />}
-        </PaneButton>
+        </HintButton>
         {view.full ? (
-          <PaneButton label="File tree (T)" onClick={() => setDetailsView((v) => ({ tree: !v.tree }))} pressed={view.tree}>
+          <HintButton
+            label="File tree"
+            hint="T"
+            onClick={() => setDetailsView((v) => ({ tree: !v.tree }))}
+            pressed={view.tree}
+          >
             <ListTreeIcon />
-          </PaneButton>
+          </HintButton>
         ) : null}
-        <PaneButton
-          label={view.full ? "Leave full screen (D)" : "Full screen (D)"}
+        <HintButton
+          label={view.full ? "Leave full screen" : "Full screen"}
+          hint="D"
           onClick={() => setDetailsView((v) => ({ full: !v.full }))}
         >
           {view.full ? <Minimize2Icon /> : <Maximize2Icon />}
-        </PaneButton>
-        <PaneButton
-          label={view.full ? "Leave full screen (Esc)" : "Hide details (d)"}
+        </HintButton>
+        <HintButton
+          label={view.full ? "Leave full screen" : "Hide details"}
+          hint={view.full ? "Esc" : "d"}
           onClick={() => setDetailsView(view.full ? { full: false } : { visible: false })}
         >
           <XIcon />
-        </PaneButton>
+        </HintButton>
       </div>
       {/* The tree panel collapses rather than unmounts, so the diff keeps its scroll and focus. */}
       <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
@@ -662,32 +712,31 @@ function fileAt(l: DiffLayout, top: number): string {
   return path
 }
 
-function PaneButton({
-  label,
-  onClick,
-  disabled,
-  pressed,
-  children,
-}: {
-  label: string
-  onClick: () => void
-  disabled?: boolean
-  pressed?: boolean
-  children: React.ReactNode
-}) {
+/** diffStats counts the files and lines the diff adds and removes, for the header. */
+function diffStats(l: DiffLayout | null): { files: number; added: number; removed: number } {
+  const out = { files: 0, added: 0, removed: 0 }
+  for (const r of l?.rows ?? []) {
+    if (r.type !== "file") continue
+    out.files++
+    out.added += r.added
+    out.removed += r.removed
+  }
+  return out
+}
+
+/** SelectionIcon tells a file, commit, branch and the Unstaged changes apart in the header. */
+function SelectionIcon({ selection }: { selection: Selection | null }) {
+  const Icon = {
+    unstaged: LayersIcon,
+    file: FileCodeIcon,
+    cfile: FileCodeIcon,
+    commit: GitCommitHorizontalIcon,
+    branch: GitBranchIcon,
+  }[selection?.kind ?? "unstaged"]
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      title={label}
-      aria-label={label}
-      aria-pressed={pressed}
-      disabled={disabled}
-      className={cn(pressed && "bg-accent")}
-      onClick={onClick}
-    >
-      {children}
-    </Button>
+    <IconTile size="xs" variant="outline" className={cn("text-muted-foreground", !selection && "invisible")}>
+      <Icon />
+    </IconTile>
   )
 }
 
@@ -718,16 +767,16 @@ function DiffSkeleton() {
     <div className="font-mono text-xs" data-testid="diff-skeleton" aria-busy="true" aria-label="Loading diff">
       {[0, 1].map((f) => (
         <div key={f}>
-          <div className="flex h-8 items-center gap-2 border-y bg-muted px-3" data-testid="diff-skeleton-file">
-            <Skeleton className="h-3 w-3 bg-foreground/10" />
+          <div className="flex h-8 items-center gap-2 border-y bg-muted/60 px-3" data-testid="diff-skeleton-file">
+            <Skeleton className="size-4 rounded-sm bg-foreground/10" />
             <Skeleton className={cn("h-3 bg-foreground/10", f === 0 ? "w-48" : "w-36")} />
           </div>
-          <div className="flex h-6 items-center bg-sky-500/5 px-3">
-            <Skeleton className="h-2.5 w-40 bg-sky-500/15" />
+          <div className="flex h-6 items-center bg-info/5 px-3">
+            <Skeleton className="h-2.5 w-40 bg-info/15" />
           </div>
           {skeletonLines.slice(0, f === 0 ? undefined : 6).map((w, i) => (
             <div key={i} className="flex h-5 items-center">
-              <span className="h-full w-[6ch] shrink-0 bg-muted" />
+              <span className="h-full w-[6ch] shrink-0 border-r bg-muted/50" />
               {w > 0 ? <Skeleton className="ml-[2.5ch] h-2.5" style={{ width: `${w}ch` }} /> : null}
             </div>
           ))}
@@ -744,7 +793,7 @@ function RowView({ row: r, hl, hunk, numW, viewportW, hunkSelected, marked, focu
     <span
       className={cn(
         "sticky left-0 z-10 w-1 shrink-0 self-stretch",
-        marked ? "bg-amber-500" : hunkSelected ? (focused ? "bg-sky-500" : "bg-sky-500/40") : "bg-transparent",
+        marked ? "bg-warning" : hunkSelected ? (focused ? "bg-primary" : "bg-primary/40") : "bg-transparent",
       )}
     />
   )
@@ -752,9 +801,13 @@ function RowView({ row: r, hl, hunk, numW, viewportW, hunkSelected, marked, focu
   switch (r.type) {
     case "file":
       return (
-        <div className="sticky left-0 flex h-8 items-center gap-2 border-y bg-muted px-3 font-sans" style={stick}>
-          <span className="w-3 text-[10px] font-semibold text-muted-foreground uppercase">{r.status.slice(0, 1)}</span>
-          <span className="min-w-0 truncate font-mono text-xs font-medium">{r.path}</span>
+        <div className="sticky left-0 flex h-8 items-center gap-2 border-y bg-muted/60 px-3 font-sans backdrop-blur-sm" style={stick}>
+          <StatusBadge status={r.status} />
+          <PathLabel path={r.path} className="text-xs font-medium" />
+          <span className="ml-auto flex shrink-0 items-center gap-1.5 font-mono text-[11px] tabular-nums">
+            {r.added > 0 ? <span className="text-success-foreground dark:text-success">+{r.added}</span> : null}
+            {r.removed > 0 ? <span className="text-destructive-foreground dark:text-destructive">−{r.removed}</span> : null}
+          </span>
         </div>
       )
     case "gap":
@@ -770,14 +823,18 @@ function RowView({ row: r, hl, hunk, numW, viewportW, hunkSelected, marked, focu
         <div
           data-testid="hunk-header"
           className={cn(
-            "flex h-6 cursor-pointer items-center text-sky-700 dark:text-sky-400",
-            hunkSelected && focused ? "bg-sky-500/20" : "bg-sky-500/5",
+            "flex h-6 cursor-pointer items-center text-info-foreground dark:text-info",
+            hunkSelected && focused ? "bg-primary/12" : "bg-info/6 hover:bg-info/10",
           )}
         >
           {bar}
-          <span className="sticky left-1 truncate px-2" style={stick}>
-            {r.header}
-            {marked ? <span className="ml-2 font-sans text-[10px] font-semibold text-amber-600 dark:text-amber-400">● marked</span> : null}
+          <span className="sticky left-1 flex min-w-0 items-center gap-2 px-2" style={stick}>
+            <span className="truncate">{r.header}</span>
+            {marked ? (
+              <Badge size="xs" variant="warning-light" className="font-sans">
+                ● marked
+              </Badge>
+            ) : null}
           </span>
         </div>
       )
@@ -810,17 +867,21 @@ function RowView({ row: r, hl, hunk, numW, viewportW, hunkSelected, marked, focu
           data-range={inRange || undefined}
           className={cn(
             "flex h-5 items-stretch leading-5 whitespace-pre",
-            r.sign === "+" && "bg-emerald-500/12",
-            r.sign === "-" && "bg-rose-500/12",
-            cursor && (focused ? "bg-sky-500/20 ring-1 ring-inset ring-sky-500/60" : "bg-sky-500/10"),
-            inRange && "bg-amber-500/20",
-            inRange && cursor && "bg-amber-500/30 ring-amber-500/70",
+            // ReUI code-block's diff tints: 8% light, 12% dark. Left off the cursor and range,
+            // whose backgrounds the dark: tint would otherwise win over.
+            !cursor && !inRange && r.sign === "+" && "bg-success/8 dark:bg-success/12",
+            !cursor && !inRange && r.sign === "-" && "bg-destructive/8 dark:bg-destructive/12",
+            cursor && (focused ? "bg-primary/15 ring-1 ring-primary/60 ring-inset" : "bg-primary/8"),
+            inRange && "bg-warning/18",
+            inRange && cursor && "bg-warning/28 ring-warning/70",
           )}
         >
           {bar}
           <span
             className={cn(
-              "sticky left-1 z-10 flex shrink-0 justify-end gap-[1ch] bg-muted px-[0.5ch] text-muted-foreground select-none",
+              "sticky left-1 z-10 flex shrink-0 justify-end gap-[1ch] border-r bg-muted px-[0.5ch] text-muted-foreground/70 tabular-nums select-none",
+              r.sign === "+" && "bg-[color-mix(in_oklab,var(--success)_10%,var(--muted))] text-success-foreground/70 dark:text-success/70",
+              r.sign === "-" && "bg-[color-mix(in_oklab,var(--destructive)_10%,var(--muted))] text-destructive-foreground/70 dark:text-destructive/70",
               cursor && focused && "text-foreground",
             )}
             style={{ width: `${numW * 2 + 2}ch` }}
@@ -831,9 +892,9 @@ function RowView({ row: r, hl, hunk, numW, viewportW, hunkSelected, marked, focu
           <span
             className={cn(
               "w-[2ch] shrink-0 pl-[0.5ch] select-none",
-              r.sign === "+" && "text-emerald-700 dark:text-emerald-400",
-              r.sign === "-" && "text-rose-700 dark:text-rose-400",
-              cursor && ranged && "text-amber-600",
+              r.sign === "+" && "text-success-foreground dark:text-success",
+              r.sign === "-" && "text-destructive-foreground dark:text-destructive",
+              cursor && ranged && "text-warning-foreground dark:text-warning",
             )}
           >
             {r.sign === "\\" ? " " : r.sign}

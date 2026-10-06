@@ -1,4 +1,6 @@
 import { useState } from "react"
+import { GitPullRequestIcon } from "lucide-react"
+import { IconTile } from "@/components/reui/icon-tile"
 import { formatKey } from "@/actions/keys"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -46,9 +48,14 @@ export function PullRequestDialog({
             submit()
           }}
         >
-          <DialogHeader>
-            <DialogTitle>Create pull request</DialogTitle>
-            <DialogDescription className="truncate">For {branch}.</DialogDescription>
+          <DialogHeader className="flex-row items-center gap-3">
+            <IconTile variant="soft" size="sm">
+              <GitPullRequestIcon />
+            </IconTile>
+            <div className="grid min-w-0 gap-0.5">
+              <DialogTitle>Create pull request</DialogTitle>
+              <DialogDescription className="truncate">For {branch}.</DialogDescription>
+            </div>
           </DialogHeader>
           <div className="grid gap-2">
             <Label htmlFor="pr-title">Title</Label>

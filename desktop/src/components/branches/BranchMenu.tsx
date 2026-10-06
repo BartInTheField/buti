@@ -1,4 +1,4 @@
-import { EllipsisIcon } from "lucide-react"
+import { EllipsisIcon, GitBranchIcon } from "lucide-react"
 import { useActions } from "@/actions/context"
 import { formatKey } from "@/actions/keys"
 import { actionGroups, availableActions } from "@/actions/registry"
@@ -63,7 +63,10 @@ function Items({ item }: { item: Selection }) {
 
   return (
     <>
-      <DropdownMenuLabel className="truncate">{item.kind === "branch" ? item.name : ""}</DropdownMenuLabel>
+      <DropdownMenuLabel className="flex items-center gap-1.5">
+        <GitBranchIcon className="size-3.5 shrink-0" />
+        <span className="truncate">{item.kind === "branch" ? item.name : ""}</span>
+      </DropdownMenuLabel>
       {groups.map((as) => (
         <DropdownMenuGroup key={as[0].group}>
           <DropdownMenuSeparator />

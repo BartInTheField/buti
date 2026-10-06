@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from "react"
+import { CircleHelpIcon, TriangleAlertIcon } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -7,6 +8,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
@@ -29,6 +31,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { PaletteFooter } from "./PaletteFooter"
 import {
   DialogsContext,
   type ConfirmOptions,
@@ -111,9 +114,20 @@ function ConfirmDialog({
     <AlertDialog open onOpenChange={(o) => !o && onDone(false)}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{opts.title}</AlertDialogTitle>
+          <AlertDialogMedia
+            className={
+              opts.destructive
+                ? "size-9 bg-destructive/10 text-destructive *:[svg]:size-4.5! dark:bg-destructive/20"
+                : "size-9 bg-primary/10 text-primary *:[svg]:size-4.5! dark:bg-primary/20"
+            }
+          >
+            {opts.destructive ? <TriangleAlertIcon /> : <CircleHelpIcon />}
+          </AlertDialogMedia>
+          {/* Titles often hold a file path with no spaces; wrap-anywhere lets it break
+              instead of widening the grid column past the dialog's edge. */}
+          <AlertDialogTitle className="wrap-anywhere">{opts.title}</AlertDialogTitle>
           {opts.body ? (
-            <AlertDialogDescription className="whitespace-pre-line">
+            <AlertDialogDescription className="whitespace-pre-line wrap-anywhere">
               {opts.body}
             </AlertDialogDescription>
           ) : null}
@@ -217,14 +231,19 @@ function PickDialog({
   })
   return (
     <Dialog open onOpenChange={(o) => !o && onDone(null)}>
-      <DialogContent className="top-1/3 translate-y-0 overflow-hidden p-0 sm:max-w-lg" showCloseButton={false}>
+      <DialogContent
+        className="top-[18%] translate-y-0 gap-0 overflow-hidden p-0 shadow-2xl sm:max-w-xl"
+        showCloseButton={false}
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>{opts.title}</DialogTitle>
           <DialogDescription>{opts.placeholder ?? opts.title}</DialogDescription>
         </DialogHeader>
-        <Command>
-          <CommandInput placeholder={opts.placeholder ?? opts.title} />
-          <CommandList className="max-h-96">
+        <Command className="rounded-none! p-0">
+          <div className="px-0.5 pt-0.5">
+            <CommandInput placeholder={opts.placeholder ?? opts.title} />
+          </div>
+          <CommandList className="max-h-96 p-1">
             <CommandEmpty>{opts.empty ?? "Nothing matches."}</CommandEmpty>
             {[...groups].map(([group, entries]) => (
               <CommandGroup key={group} heading={group || opts.title}>
@@ -236,12 +255,15 @@ function PickDialog({
                     onSelect={() => onDone(item.value)}
                   >
                     <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    {item.detail ? <CommandShortcut>{item.detail}</CommandShortcut> : null}
+                    {item.detail ? (
+                      <CommandShortcut className="max-w-[45%] truncate font-mono tracking-normal">{item.detail}</CommandShortcut>
+                    ) : null}
                   </CommandItem>
                 ))}
               </CommandGroup>
             ))}
           </CommandList>
+          <PaletteFooter action="Choose" />
         </Command>
       </DialogContent>
     </Dialog>

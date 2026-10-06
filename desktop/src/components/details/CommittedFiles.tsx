@@ -1,12 +1,13 @@
 import type { MouseEvent } from "react"
 import { useDraggable } from "@dnd-kit/core"
-import { FileIcon } from "lucide-react"
+import { FileCodeIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Change, Commit } from "@/api"
 import { ActionContextMenu } from "@/actions/ActionContextMenu"
 import { commitKey } from "@/actions/details"
 import type { DragItem } from "@/dnd"
 import { sameSelection, type Selection, type SelectionModel } from "@/selection"
+import { PathLabel, StatusBadge } from "./StatusBadge"
 import { useFilesShown } from "./store"
 
 type Props = {
@@ -22,7 +23,7 @@ export function CommittedFiles({ commit, branch, sel, onItemClick, disabled }: P
   const shown = useFilesShown(commitKey(commit))
   if (!shown || !commit.changes?.length) return null
   return (
-    <ul className="flex flex-col gap-0.5 pt-0.5 pb-1 pl-4" data-testid="commit-files">
+    <ul className="ml-3.5 flex flex-col gap-px border-l pt-0.5 pb-1 pl-1.5" data-testid="commit-files">
       {commit.changes.map((ch) => (
         <CommittedFileRow
           key={ch.cliId}
@@ -69,16 +70,18 @@ function CommittedFileRow({
           {...listeners}
           {...attributes}
           className={cn(
-            "flex h-6 w-full cursor-grab items-center gap-1.5 rounded-md px-2 text-left text-xs active:cursor-grabbing",
-            sameSelection(sel.selection, item) ? "bg-accent font-medium" : "hover:bg-muted/70",
+            "flex h-6 w-full cursor-grab items-center gap-1.5 rounded-md px-1.5 text-left text-xs transition-colors active:cursor-grabbing",
+            sameSelection(sel.selection, item)
+              ? "bg-primary/10 font-medium ring-1 ring-primary/40 ring-inset"
+              : "hover:bg-muted/70",
             sel.isMarked(item) && "bg-primary/15",
             isDragging && "opacity-40",
           )}
           onClick={(e) => onItemClick(item, e)}
         >
-          <FileIcon className="size-3 shrink-0 opacity-60" />
-          <span className="min-w-0 flex-1 truncate font-mono">{change.filePath}</span>
-          <span className="text-[10px] text-muted-foreground uppercase">{change.changeType.slice(0, 1)}</span>
+          <FileCodeIcon className="size-3.5 shrink-0 text-muted-foreground" />
+          <PathLabel path={change.filePath} className="flex-1" />
+          <StatusBadge status={change.changeType} />
         </button>
       </ActionContextMenu>
     </li>

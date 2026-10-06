@@ -1,17 +1,17 @@
 import { CloudIcon, CloudOffIcon, CloudUploadIcon, GitMergeIcon, GitPullRequestIcon, TriangleAlertIcon } from "lucide-react"
 import { branchPR, type Branch } from "@/api"
-import { Badge } from "@/components/ui/badge"
+import { Badge, type BadgeProps } from "@/components/reui/badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
 import { pushState } from "./format"
 
-const toneClass = {
-  local: "text-muted-foreground",
-  ahead: "border-amber-500/40 text-amber-700 dark:text-amber-400",
-  force: "border-destructive/40 text-destructive",
-  pushed: "border-teal-500/40 text-teal-700 dark:text-teal-400",
-  integrated: "border-primary/40 text-primary",
-} as const
+/** The ReUI light variant for each push state: neutral, then warning, danger, done. */
+const toneVariant = {
+  local: "outline",
+  ahead: "warning-light",
+  force: "destructive-light",
+  pushed: "success-light",
+  integrated: "primary-light",
+} as const satisfies Record<string, BadgeProps["variant"]>
 
 const toneIcon = {
   local: CloudOffIcon,
@@ -34,7 +34,7 @@ export function BranchBadges({ branch }: { branch: Branch }) {
       {pr ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Badge variant="outline" className="text-[10px]" data-testid="pr-badge">
+            <Badge variant="info-light" size="sm" data-testid="pr-badge">
               <GitPullRequestIcon />
               {pr}
             </Badge>
@@ -46,8 +46,9 @@ export function BranchBadges({ branch }: { branch: Branch }) {
         <Tooltip>
           <TooltipTrigger asChild>
             <Badge
-              variant="outline"
-              className={cn("max-w-24 text-[10px]", toneClass[push.tone])}
+              variant={toneVariant[push.tone]}
+              size="sm"
+              className={push.tone === "local" ? "max-w-24 text-muted-foreground" : "max-w-24"}
               data-testid="push-badge"
             >
               <PushIcon />

@@ -31,7 +31,7 @@ test.describe("commit verbs", () => {
     page.locator(`[data-testid="branch-card"][data-branch="${name}"]`)
   const commitRow = (page: Page, subject: string) =>
     page.getByTestId("commit-row").filter({ hasText: subject })
-  const fileRow = (page: Page, path: string) => page.getByTestId("file-row").filter({ hasText: path })
+  const fileRow = (page: Page, path: string) => page.locator(`[data-testid="file-row"][title="${path}"]`)
 
   async function boxes(page: Page) {
     return page

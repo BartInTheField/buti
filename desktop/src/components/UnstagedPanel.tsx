@@ -1,13 +1,15 @@
-import type { MouseEvent } from "react"
+import { useMemo, type CSSProperties, type MouseEvent } from "react"
 import { useDraggable, useDroppable } from "@dnd-kit/core"
-import { FileIcon, FolderOpenIcon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { CircleCheckIcon, FolderGit2Icon } from "lucide-react"
+import { Badge } from "@/components/reui/badge"
+import { IconTile } from "@/components/reui/icon-tile"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import type { Change } from "@/api"
 import { ActionContextMenu } from "@/actions/ActionContextMenu"
 import { dropHint, type DragItem, type DropTarget } from "@/dnd"
 import { sameSelection, type Selection, type SelectionModel } from "@/selection"
+import { PathTree, TreeFileLabel, treeFileClass, treeRowHover, treeRowSelected } from "./details/FileTree"
 import { DropHint } from "./DropHint"
 import { targetClass, useTargetDeco } from "./target/context"
 import { TargetTag } from "./target/TargetTag"
@@ -28,6 +30,7 @@ export function UnstagedPanel({ changes, sel, onItemClick, activeDrag, disabled 
   const area: Selection = { kind: "unstaged" }
   // Only a valid Unstaged gets a ring: dimming the panel would dim the files in it too.
   const deco = useTargetDeco("unstaged")
+  const files = useMemo(() => changes.map((change) => ({ path: change.filePath, change })), [changes])
 
   return (
     <div
@@ -44,14 +47,16 @@ export function UnstagedPanel({ changes, sel, onItemClick, activeDrag, disabled 
         <button
           type="button"
           className={cn(
-            "flex items-center gap-2 border-b px-3 py-2 text-left text-sm font-medium hover:bg-sidebar-accent",
-            sameSelection(sel.selection, area) && "bg-sidebar-accent",
+            "flex h-10 shrink-0 items-center gap-2 border-b px-3 text-left text-sm font-medium transition-colors",
+            sameSelection(sel.selection, area) ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60",
           )}
           onClick={(e) => onItemClick(area, e)}
         >
-          <FolderOpenIcon className="size-4 shrink-0 opacity-70" />
+          <IconTile variant="outline" size="xs" aria-hidden="true">
+            <FolderGit2Icon />
+          </IconTile>
           <span className="flex-1">Unstaged</span>
-          <Badge variant="secondary" className="tabular-nums">
+          <Badge variant={changes.length ? "primary-light" : "secondary"} size="sm" radius="full" className="tabular-nums">
             {changes.length}
           </Badge>
         </button>
@@ -59,21 +64,29 @@ export function UnstagedPanel({ changes, sel, onItemClick, activeDrag, disabled 
       <DropHint text={hint} className="bottom-3 left-1/2 -translate-x-1/2" />
       <TargetTag deco={deco} className="bottom-3 left-1/2 -translate-x-1/2" />
       <ScrollArea className="min-h-0 flex-1">
-        <ul className="flex flex-col gap-0.5 p-2">
-          {changes.length === 0 ? (
-            <li className="px-2 py-3 text-xs text-muted-foreground">No uncommitted changes</li>
-          ) : (
-            changes.map((ch) => (
+        {changes.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+            <IconTile variant="soft" size="sm" className="text-success" aria-hidden="true">
+              <CircleCheckIcon />
+            </IconTile>
+            <p className="text-xs text-muted-foreground">No uncommitted changes</p>
+          </div>
+        ) : (
+          <PathTree
+            files={files}
+            className="p-1.5 select-none"
+            renderFile={(f, name, pad) => (
               <FileRow
-                key={ch.cliId}
-                change={ch}
+                change={f.change}
+                name={name}
+                pad={pad}
                 sel={sel}
                 onItemClick={onItemClick}
                 disabled={disabled}
               />
-            ))
-          )}
-        </ul>
+            )}
+          />
+        )}
       </ScrollArea>
     </div>
   )
@@ -81,11 +94,15 @@ export function UnstagedPanel({ changes, sel, onItemClick, activeDrag, disabled 
 
 function FileRow({
   change,
+  name,
+  pad,
   sel,
   onItemClick,
   disabled,
 }: {
   change: Change
+  name: string
+  pad: CSSProperties
   sel: SelectionModel
   onItemClick: (item: Selection, e: MouseEvent) => void
   disabled?: boolean
@@ -100,31 +117,28 @@ function FileRow({
   const marked = sel.isMarked(item)
   const deco = useTargetDeco(`file:${change.cliId}`)
   return (
-    <li>
-      <ActionContextMenu item={item}>
-        <button
-          type="button"
-          data-testid="file-row"
-          data-target-key={`file:${change.cliId}`}
-          ref={setNodeRef}
-          {...listeners}
-          {...attributes}
-          className={cn(
-            "flex w-full cursor-grab items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs active:cursor-grabbing",
-            selected ? "bg-sidebar-accent font-medium" : "hover:bg-sidebar-accent/70",
-            marked && "bg-primary/15 ring-1 ring-inset ring-primary/40",
-            isDragging && "opacity-40",
-            targetClass(deco, { inset: true }),
-          )}
-          onClick={(e) => onItemClick(item, e)}
-        >
-          <FileIcon className="size-3.5 shrink-0 opacity-60" />
-          <span className="min-w-0 flex-1 truncate font-mono">{change.filePath}</span>
-          <span className="shrink-0 text-[10px] text-muted-foreground uppercase">
-            {change.changeType.slice(0, 1)}
-          </span>
-        </button>
-      </ActionContextMenu>
-    </li>
+    <ActionContextMenu item={item}>
+      <button
+        type="button"
+        data-testid="file-row"
+        data-target-key={`file:${change.cliId}`}
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        className={cn(
+          treeFileClass,
+          "cursor-grab active:cursor-grabbing",
+          selected ? treeRowSelected : treeRowHover,
+          marked && "bg-primary/12 text-foreground ring-1 ring-inset ring-primary/40 dark:bg-primary/20",
+          isDragging && "opacity-40",
+          targetClass(deco, { inset: true }),
+        )}
+        style={pad}
+        title={change.filePath}
+        onClick={(e) => onItemClick(item, e)}
+      >
+        <TreeFileLabel name={name} status={change.changeType} />
+      </button>
+    </ActionContextMenu>
   )
 }

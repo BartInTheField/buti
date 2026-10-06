@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Kbd } from "@/components/ui/kbd"
+import { PaletteFooter } from "@/dialogs/PaletteFooter"
 import { describeSubjects } from "@/selection"
 import { formatKey } from "./keys"
 import {
@@ -64,7 +65,7 @@ export function CommandPalette({ mode, onClose, context, run }: Props) {
   return (
     <Dialog open={mode !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="top-1/3 translate-y-0 overflow-hidden p-0 sm:max-w-lg"
+        className="top-[18%] translate-y-0 gap-0 overflow-hidden p-0 shadow-2xl sm:max-w-xl"
         showCloseButton={false}
       >
         <DialogHeader className="sr-only">
@@ -72,9 +73,11 @@ export function CommandPalette({ mode, onClose, context, run }: Props) {
           <DialogDescription>Type to search, enter runs.</DialogDescription>
         </DialogHeader>
         {ctx ? (
-          <Command>
-            <CommandInput placeholder={`${heading} · type to search`} />
-            <CommandList className="max-h-[min(28rem,60vh)]">
+          <Command className="rounded-none! p-0">
+            <div className="px-0.5 pt-0.5">
+              <CommandInput placeholder={`${heading} · type to search`} />
+            </div>
+            <CommandList className="max-h-[min(28rem,60vh)] p-1">
               <CommandEmpty>No matching commands.</CommandEmpty>
               {actionGroups.map((group) => {
                 const inGroup = actions.filter((a) => a.group === group)
@@ -115,6 +118,7 @@ export function CommandPalette({ mode, onClose, context, run }: Props) {
                 </CommandGroup>
               ) : null}
             </CommandList>
+            <PaletteFooter />
           </Command>
         ) : null}
       </DialogContent>

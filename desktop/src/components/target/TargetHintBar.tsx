@@ -1,5 +1,5 @@
 import { ListIcon, XIcon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/reui/badge"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { Separator } from "@/components/ui/separator"
@@ -31,10 +31,12 @@ export function TargetHintBar({ state }: { state: TargetState }) {
       role="toolbar"
       aria-label="Choose a target"
       data-testid="target-bar"
-      className="fixed bottom-4 left-1/2 z-40 flex w-[min(56rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-2 rounded-xl border bg-popover p-2 text-popover-foreground shadow-lg"
+      className="fixed bottom-4 left-1/2 z-40 flex w-[min(56rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-1 rounded-xl border bg-muted/80 p-1 text-popover-foreground shadow-lg backdrop-blur-sm"
     >
-      <div className="flex h-7 items-center gap-2">
-        <Badge className={cn("uppercase", info.chip)}>{info.title}</Badge>
+      <div className="flex h-9 items-center gap-2 rounded-lg border bg-popover px-2 shadow-xs">
+        <Badge size="lg" className={cn("min-w-16 uppercase tracking-wide", info.chip)}>
+          {info.title}
+        </Badge>
         <p
           data-testid="target-desc"
           className={cn("min-w-0 flex-1 truncate text-sm", !plan && "text-muted-foreground")}
@@ -52,7 +54,7 @@ export function TargetHintBar({ state }: { state: TargetState }) {
           <Kbd>Esc</Kbd>
         </Button>
       </div>
-      <div className="flex h-7 items-center gap-2">
+      <div className="flex h-8 items-center gap-2 px-1">
         <ToggleGroup
           type="single"
           size="sm"

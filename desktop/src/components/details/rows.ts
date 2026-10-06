@@ -20,7 +20,7 @@ export type LineRow = {
 }
 
 export type Row =
-  | { type: "file"; key: string; path: string; status: string }
+  | { type: "file"; key: string; path: string; status: string; added: number; removed: number }
   | { type: "hunk"; key: string; hunk: number; header: string }
   | LineRow
   | { type: "note"; key: string; hunk: number; comment: LocatedComment; outdated: boolean; after: string }
@@ -71,12 +71,14 @@ export function layoutDiff(diff: Diff, ids: boolean): DiffLayout {
     }
   }
   let prevPath = ""
+  let fileRow: Extract<Row, { type: "file" }> | null = null
   for (const f of diff.changes) {
     // Uncommitted diffs list one entry per hunk; group them under one file header.
     if (f.path !== prevPath) {
       if (prevPath !== "") out.rows.push({ type: "gap", key: `gap:${f.path}` })
       out.files.push({ path: f.path, row: out.rows.length, hunk: -1 })
-      out.rows.push({ type: "file", key: `file:${f.path}`, path: f.path, status: f.status })
+      fileRow = { type: "file", key: `file:${f.path}`, path: f.path, status: f.status, added: 0, removed: 0 }
+      out.rows.push(fileRow)
     }
     prevPath = f.path
     if (f.diff.type !== "patch") {
@@ -114,11 +116,13 @@ export function layoutDiff(diff: Diff, ids: boolean): DiffLayout {
         let row: LineRow
         switch (sign) {
           case "-":
+            if (fileRow) fileRow.removed++
             row = { type: "line", key: "", hunk: index, sign, old: h.oldStart + oi, new: 0, code, src: { side: 0, i: oldSrc.length } }
             oldSrc.push(shown)
             oi++
             break
           case "+":
+            if (fileRow) fileRow.added++
             row = { type: "line", key: "", hunk: index, sign, old: 0, new: h.newStart + ni, code, src: { side: 1, i: newSrc.length } }
             newSrc.push(shown)
             ni++

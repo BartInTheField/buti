@@ -1,8 +1,8 @@
 import { useState, type RefObject } from "react"
-import { Button } from "@/components/ui/button"
+import { MessageSquarePlusIcon } from "lucide-react"
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group"
 import { Kbd } from "@/components/ui/kbd"
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
-import { Textarea } from "@/components/ui/textarea"
 import { formatKey } from "@/actions/keys"
 
 type Props = {
@@ -50,7 +50,7 @@ function Editor({ title, initial, onSubmit, onClose }: Omit<Props, "open" | "anc
     <PopoverContent
       side="bottom"
       align="start"
-      className="w-[min(32rem,calc(100vw-2rem))]"
+      className="w-[min(32rem,calc(100vw-2rem))] gap-2"
       data-testid="comment-composer"
       onKeyDown={(e) => {
         if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "Enter")) {
@@ -59,26 +59,38 @@ function Editor({ title, initial, onSubmit, onClose }: Omit<Props, "open" | "anc
         }
       }}
     >
-      <p className="truncate text-xs font-medium">{title}</p>
-      <Textarea
-        autoFocus
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Leave a comment"
-        className="min-h-24 resize-y text-sm"
-        aria-label="Comment"
-      />
-      <div className="flex items-center gap-2">
-        <span className="flex-1 text-[11px] text-muted-foreground">
-          <Kbd>{formatKey("mod+s")}</Kbd> saves · <Kbd>Esc</Kbd> cancels
-        </span>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button size="sm" onClick={() => void save()} disabled={empty || saving}>
-          Save
-        </Button>
-      </div>
+      <p className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
+        <MessageSquarePlusIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className="truncate">{title}</span>
+      </p>
+      {/* ReUI c-input-group-26: the actions sit inside the field, under the text. */}
+      <InputGroup>
+        <InputGroupTextarea
+          autoFocus
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Leave a comment"
+          className="max-h-64 min-h-24 resize-y text-sm"
+          aria-label="Comment"
+        />
+        <InputGroupAddon align="block-end" className="cursor-default border-t pt-2 font-normal">
+          <span className="flex flex-1 items-center gap-1 text-[11px]">
+            <Kbd>{formatKey("mod+s")}</Kbd> saves · <Kbd>Esc</Kbd> cancels
+          </span>
+          <InputGroupButton variant="ghost" size="sm" className="h-7 px-2.5" onClick={onClose}>
+            Cancel
+          </InputGroupButton>
+          <InputGroupButton
+            variant="default"
+            size="sm"
+            className="h-7 px-2.5"
+            onClick={() => void save()}
+            disabled={empty || saving}
+          >
+            Save
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
     </PopoverContent>
   )
 }

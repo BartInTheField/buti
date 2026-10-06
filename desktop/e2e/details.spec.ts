@@ -44,7 +44,7 @@ async function api(page: Page, route: string, body?: unknown) {
 }
 
 async function openFile(page: Page, name: string) {
-  await page.getByTestId("file-row").filter({ hasText: name }).click()
+  await page.locator(`[data-testid="file-row"][title="${name}"]`).click()
   await expect(page.getByTestId("diff-pane").getByRole("heading")).toHaveText(name)
   await expect(page.getByTestId("diff-line").first()).toBeVisible()
 }
@@ -260,12 +260,12 @@ test("hunk marks: space marks the cursor's hunk and commit acts on it", async ({
   await composer.locator("textarea").fill("Listen on 9090")
   await page.keyboard.press("ControlOrMeta+Enter")
   await expect(empty).toContainText("Listen on 9090")
-  await expect(page.getByTestId("file-row").filter({ hasText: "src/server.go" })).toHaveCount(0)
+  await expect(page.locator(`[data-testid="file-row"][title="src/server.go"]`)).toHaveCount(0)
 
   // Put the fixture back for the other specs.
   expect((await api(page, "/ops/undo", {})).ok).toBe(true)
   await page.getByRole("button", { name: "Refresh" }).click()
-  await expect(page.getByTestId("file-row").filter({ hasText: "src/server.go" })).toHaveCount(1)
+  await expect(page.locator(`[data-testid="file-row"][title="src/server.go"]`)).toHaveCount(1)
   await expect(empty).not.toContainText("Listen on 9090")
 })
 
@@ -276,12 +276,12 @@ test("x on the cursor's hunk discards only that hunk", async ({ page }) => {
   const confirm = page.getByRole("alertdialog")
   await expect(confirm).toContainText("Discard hunk of src/server.go?")
   await confirm.getByRole("button", { name: "Discard" }).click()
-  await expect(page.getByTestId("file-row").filter({ hasText: "src/server.go" })).toHaveCount(0)
+  await expect(page.locator(`[data-testid="file-row"][title="src/server.go"]`)).toHaveCount(0)
   await expect(page.getByTestId("file-row").filter({ hasText: "README.md" })).toHaveCount(1)
 
   expect((await api(page, "/ops/undo", {})).ok).toBe(true)
   await page.getByRole("button", { name: "Refresh" }).click()
-  await expect(page.getByTestId("file-row").filter({ hasText: "src/server.go" })).toHaveCount(1)
+  await expect(page.locator(`[data-testid="file-row"][title="src/server.go"]`)).toHaveCount(1)
 })
 
 test("a committed file uncommits with r and moves into another commit by drag", async ({ page }) => {
@@ -382,6 +382,26 @@ test("copy and go to", async ({ page, context }) => {
   await page.screenshot({ path: `${shots}/goto.png` })
   await page.keyboard.press("Enter")
   await expect(page.getByTestId("diff-pane").getByRole("heading")).toHaveText("src/util/strings.go")
+})
+
+test("dark mode: a dragged range shows on added lines", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" })
+  await openFile(page, "src/util/strings.go")
+  const added = page.locator('[data-testid="diff-line"][data-sign="+"]')
+  // Earlier tests commit and discard hunks of this file, so only count on two added lines.
+  const bg = (i: number) => added.nth(i).evaluate((el) => getComputedStyle(el).backgroundColor)
+  const plain = await bg(0)
+  const from = (await added.nth(0).boundingBox())!
+  const to = (await added.nth(1).boundingBox())!
+  await page.mouse.move(from.x + 80, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(to.x + 80, to.y + to.height / 2, { steps: 6 })
+  await page.mouse.up()
+  await expect(pane(page).locator("[data-range]")).toHaveCount(2)
+  // The diff's dark: tint used to win over the range's, so only the cursor line showed.
+  expect(await bg(0)).not.toBe(plain)
+  await settle(page)
+  await page.screenshot({ path: `${shots}/dark-range-drag.png` })
 })
 
 test("dark mode: highlighted diff with a comment, full screen", async ({ page }) => {

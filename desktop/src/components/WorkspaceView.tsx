@@ -11,9 +11,10 @@ import {
   type Modifier,
 } from "@dnd-kit/core"
 import { getEventCoordinates } from "@dnd-kit/utilities"
-import { CommandIcon, RefreshCwIcon } from "lucide-react"
+import { CircleAlertIcon, CommandIcon, RefreshCwIcon } from "lucide-react"
 import { toast } from "sonner"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Badge } from "@/components/reui/badge"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import {
@@ -166,28 +167,29 @@ function WorkspaceScreen({
 
   return (
     <div className="flex h-svh flex-col">
-      <header className="flex items-center justify-between gap-3 border-b px-4 py-2">
-        <div className="flex min-w-0 items-center gap-3">
+      <header className="flex h-11 shrink-0 items-center justify-between gap-3 border-b bg-background px-3">
+        <div className="flex min-w-0 items-center gap-2.5">
           <BrandLogo />
           <span className="h-4 w-px shrink-0 bg-border" aria-hidden="true" />
           <h1 className="flex min-w-0">
             <RepoMenu dir={workspace.repo} />
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {marked > 0 ? (
-            <span className="text-xs text-muted-foreground" data-testid="marks">
+            <Badge variant="primary-light" size="lg" className="max-w-80 truncate" data-testid="marks">
               {describeSubjects(sel.marks)} marked
-            </span>
+            </Badge>
           ) : null}
           {workspace.upstreamState?.behind ? (
             <UpstreamButton behind={workspace.upstreamState.behind} />
           ) : null}
           <HistoryButtons />
-          <Button variant="ghost" size="sm" onClick={() => actions.openPalette("all")}>
+          <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden="true" />
+          <Button variant="outline" size="sm" className="text-muted-foreground" onClick={() => actions.openPalette("all")}>
             <CommandIcon />
             Commands
-            <Kbd>{formatKey("mod+k")}</Kbd>
+            <Kbd className="-mr-1">{formatKey("mod+k")}</Kbd>
           </Button>
           <Button
             variant="outline"
@@ -202,7 +204,8 @@ function WorkspaceScreen({
       </header>
 
       {error ? (
-        <Alert variant="destructive" className="mx-4 mt-3 w-auto">
+        <Alert variant="destructive" className="mx-3 mt-2 w-auto">
+          <CircleAlertIcon />
           <AlertTitle>Could not refresh the workspace</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
@@ -257,7 +260,7 @@ function WorkspaceScreen({
         />
         <DragOverlay dropAnimation={null} modifiers={[besideCursor]}>
           {activeDrag ? (
-            <div className="w-fit max-w-64 truncate rounded-md border bg-card px-3 py-1.5 text-xs shadow-md">
+            <div className="w-fit max-w-64 truncate rounded-md border bg-popover px-2.5 py-1 font-mono text-xs text-popover-foreground shadow-lg ring-1 ring-primary/20">
               {dragSources(activeDrag).length > 1
                 ? `${dragSources(activeDrag).length} ${activeDrag.kind === "cfile" ? "file" : activeDrag.kind}s`
                 : activeDrag.label}

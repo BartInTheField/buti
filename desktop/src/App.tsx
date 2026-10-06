@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { CircleAlertIcon, ExternalLinkIcon, RefreshCwIcon, UnplugIcon } from "lucide-react"
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/reui/alert"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { eventKeys, typingIn } from "@/actions/keys"
 import { toastError } from "@/actions/toast"
 import { ApiRequestError, type ApiConfig, type ApiError } from "./api"
@@ -17,7 +19,7 @@ export default function App() {
   if (config.isPending) {
     return (
       <Shell>
-        <p className="text-sm text-muted-foreground">Reading workspace…</p>
+        <Loading />
       </Shell>
     )
   }
@@ -26,10 +28,13 @@ export default function App() {
     return (
       <Shell>
         <Alert variant="destructive">
+          <UnplugIcon />
           <AlertTitle>No local API</AlertTitle>
           <AlertDescription>
-            Start this window with <code>buti desktop</code> so it receives the
-            loopback API address.
+            <p>
+              Start this window with <code className="font-mono text-xs text-foreground">buti desktop</code> so it
+              receives the loopback API address.
+            </p>
           </AlertDescription>
         </Alert>
       </Shell>
@@ -59,7 +64,7 @@ function Screen({ cfg }: { cfg: ApiConfig }) {
   if (workspace.isPending || reopen.pending || repos.switching) {
     return (
       <Shell>
-        <p className="text-sm text-muted-foreground">Reading workspace…</p>
+        <Loading />
       </Shell>
     )
   }
@@ -153,22 +158,28 @@ function Shell({
   refreshing?: boolean
 }) {
   return (
-    <main className="mx-auto flex min-h-svh max-w-2xl flex-col gap-6 px-6 py-10">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <BrandLogo className="mb-2" />
-          <h1 className="font-heading text-2xl font-medium tracking-tight">
-            Workspace
-          </h1>
-        </div>
+    <div className="flex min-h-svh flex-col">
+      {/* The workspace header's frame, so switching screens does not move the brand. */}
+      <header className="flex h-11 shrink-0 items-center justify-between gap-3 border-b px-3">
+        <BrandLogo />
         {onRefresh ? (
-          <Button variant="outline" onClick={onRefresh} disabled={refreshing}>
+          <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
+            <RefreshCwIcon className={refreshing ? "animate-spin" : undefined} />
             Refresh
           </Button>
         ) : null}
       </header>
-      {children}
-    </main>
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-6 px-6 pt-[12vh] pb-10">{children}</main>
+    </div>
+  )
+}
+
+function Loading() {
+  return (
+    <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+      <Spinner aria-hidden="true" />
+      Reading workspace…
+    </p>
   )
 }
 
@@ -189,22 +200,21 @@ function StatusAlert({ error }: { error: ApiError }) {
       : "Could not read workspace"
   return (
     <Alert variant="destructive">
+      <CircleAlertIcon />
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>
         <p>{error.message}</p>
-        {error.docsUrl ? (
-          <p className="mt-2">
-            <a
-              className="underline underline-offset-3"
-              href={error.docsUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Install the GitButler CLI
-            </a>
-          </p>
-        ) : null}
       </AlertDescription>
+      {error.docsUrl ? (
+        <AlertAction>
+          <Button variant="outline" size="sm" asChild>
+            <a href={error.docsUrl} target="_blank" rel="noreferrer">
+              Install the GitButler CLI
+              <ExternalLinkIcon data-icon="inline-end" />
+            </a>
+          </Button>
+        </AlertAction>
+      ) : null}
     </Alert>
   )
 }

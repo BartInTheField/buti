@@ -19,6 +19,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@fontsource-variable/inter": "5.2.8",
     "@fontsource-variable/jetbrains-mono": "5.2.8",
+    "@headless-tree/core": "^1.7.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.104.1",
     "@tanstack/react-virtual": "3.13.12",
