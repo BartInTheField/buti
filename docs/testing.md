@@ -43,7 +43,7 @@ Commands that don't return quickly (the refresh tick, toast timers) are dropped 
 | stack 3 | `empty`: no commits |
 | unapplied | `old-experiment`, 1 commit |
 | uncommitted | `README.md` and `src/server.go` modified, `src/util/strings.go` added, `docs/old.md` deleted |
-| `Repo.Conflict()` | adds `changelog` (a commit adding `CHANGELOG.md`) and pulls, which leaves that commit conflicted |
+| `Repo.Conflict()` | opt-in (`mkrepo -conflict`): adds `changelog` (a commit adding `CHANGELOG.md`) and pulls, which leaves that commit conflicted. It also sets the identity in the repository's git config, so resolving it works without `testrepo.Env`. The TUI's `TestE2EResolveInEditMode` and the desktop's `e2e/conflicts.spec.ts` use it |
 
 `origin` is a local bare repository, so pushing works offline. `but` and git run with their own `HOME`, XDG dirs and a
 fixed identity (`testrepo.Env`), so your GitButler project list and settings are left alone. Commit dates are fixed,
