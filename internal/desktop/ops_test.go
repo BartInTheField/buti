@@ -153,3 +153,120 @@ func TestWorkspaceFromNilSlices(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestOpsParity(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "but.log")
+	script := "#!/bin/sh\n" +
+		"echo \"$*\" >>" + logPath + "\n" +
+		"case \"$*\" in\n" +
+		"  status*) cat <<'STATUS'\n" + sampleStatus + "\nSTATUS\n ;;\n" +
+		"  undo*) echo 'Undid commit' ;;\n" +
+		"  'branch list'*) echo '{\"appliedStacks\":[],\"branches\":[{\"name\":\"old\",\"hasLocal\":true,\"lastCommitAt\":1}]}' ;;\n" +
+		"  'branch show'*) echo '{\"reviews\":[{\"url\":\"https://example.com/pr/3\"}]}' ;;\n" +
+		"  'oplog list'*) echo '[{\"id\":\"abc1234def\",\"createdAt\":1,\"details\":{\"operation\":\"CreateCommit\",\"title\":\"CreateCommit\",\"body\":\"\"}}]' ;;\n" +
+		"  *) exit 0 ;;\n" +
+		"esac\n"
+	srv := start(t, writeBut(t, script))
+
+	cases := []struct {
+		path, body, want, output string
+	}{
+		{"/ops/empty-commit", `{"placement":{"above":"c2"}}`, "commit --empty --no-message --above c2", ""},
+		{"/ops/absorb", `{}`, "absorb", ""},
+		{"/ops/absorb", `{"sources":["f1","f2"]}`, "absorb f2", ""},
+		{"/ops/squash", `{"sources":["c3"],"target":"c2","mode":"target"}`, "squash --target c2 --use-target-message c3", ""},
+		{"/ops/reword", `{"target":"c2","message":"better"}`, "reword c2 --message better", ""},
+		{"/ops/discard", `{"targets":["f1"]}`, "discard f1", ""},
+		{"/ops/branch-new", `{"name":"my feature","placement":{"below":"b2"}}`, "branch new --below b2 my-feature", ""},
+		{"/ops/branch-delete", `{"branches":["auth"]}`, "branch delete auth", ""},
+		{"/ops/pick", `{"sources":["c9"],"placement":{"branch":"api"}}`, "pick c9 --branch api", ""},
+		{"/ops/apply", `{"branch":"old"}`, "apply old", ""},
+		{"/ops/unapply", `{"branch":"auth"}`, "unapply auth", ""},
+		{"/ops/push", `{"branch":"auth","force":true}`, "push auth --with-force", ""},
+		{"/ops/pull", ``, "pull", ""},
+		{"/ops/undo", `{}`, "undo", "Undid commit"},
+		{"/ops/redo", `{}`, "redo", ""},
+		{"/ops/pr-new", `{"branch":"auth","draft":true}`, "pr new auth --default --draft", ""},
+		{"/ops/oplog-restore", `{"snapshot":"abc"}`, "oplog restore abc", ""},
+		{"/ops/land", `{"branch":"api"}`, "land api --yes", ""},
+		{"/ops/clean", `{}`, "clean", ""},
+		{"/ops/resolve-start", `{"commit":"c2"}`, "resolve c2", ""},
+		{"/ops/resolve-finish", `{}`, "resolve finish", ""},
+		{"/ops/resolve-cancel", `{"force":true}`, "resolve cancel --force", ""},
+		{"/exec", `{"line":"but undo 'with space'"}`, "undo with space", "Undid commit"},
+	}
+	for _, tc := range cases {
+		res := post(t, srv, tc.path, srv.Token, tc.body, "")
+		body := decode(t, res)
+		if res.StatusCode != http.StatusOK || body["ok"] != true {
+			t.Fatalf("%s: status %d body %#v", tc.path, res.StatusCode, body)
+		}
+		if tc.output != "" && body["output"] != tc.output {
+			t.Fatalf("%s: output %#v", tc.path, body["output"])
+		}
+	}
+	logged, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(logged)
+	for _, tc := range cases {
+		if !strings.Contains(text, tc.want+"\n") {
+			t.Fatalf("log missing %q in:\n%s", tc.want, text)
+		}
+	}
+	if !strings.Contains(text, "status --json -f --refresh-prs") {
+		t.Fatalf("push and pr new should sync PRs:\n%s", text)
+	}
+
+	res := get(t, srv, "/workspace?sync=1", srv.Token, "")
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("synced workspace %d", res.StatusCode)
+	}
+	res = get(t, srv, "/branches", srv.Token, "")
+	branches := decode(t, res)["branches"].(map[string]any)["branches"].([]any)
+	if len(branches) != 1 || branches[0].(map[string]any)["name"] != "old" {
+		t.Fatalf("branches %#v", branches)
+	}
+	res = get(t, srv, "/oplog", srv.Token, "")
+	entries := decode(t, res)["entries"].([]any)
+	if len(entries) != 1 || entries[0].(map[string]any)["id"] != "abc1234def" {
+		t.Fatalf("oplog %#v", entries)
+	}
+	res = get(t, srv, "/review-url?branch=auth", srv.Token, "")
+	if url := decode(t, res)["url"]; url != "https://example.com/pr/3" {
+		t.Fatalf("review url %#v", url)
+	}
+}
+
+func TestOpsParityValidation(t *testing.T) {
+	srv := start(t, writeBut(t, "#!/bin/sh\necho '{}'\n"))
+	cases := []struct{ path, body string }{
+		{"/ops/squash", `{"target":"c2"}`},
+		{"/ops/squash", `{"sources":["c3"],"mode":"weird"}`},
+		{"/ops/reword", `{"target":"c2","message":"  "}`},
+		{"/ops/apply", `{}`},
+		{"/ops/push", `{}`},
+		{"/ops/land", `{}`},
+		{"/ops/resolve-start", `{}`},
+		{"/exec", `{"line":"  "}`},
+		{"/exec", `{"line":"commit -m 'oops"}`},
+		{"/ops/undo", `not json`},
+	}
+	for _, tc := range cases {
+		if res := post(t, srv, tc.path, srv.Token, tc.body, ""); res.StatusCode != http.StatusBadRequest {
+			t.Fatalf("%s %s: %d", tc.path, tc.body, res.StatusCode)
+		}
+	}
+	if res := get(t, srv, "/review-url", srv.Token, ""); res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("review-url without branch: %d", res.StatusCode)
+	}
+	for _, path := range []string{"/oplog", "/branches", "/review-url?branch=x"} {
+		if res := get(t, srv, path, "", ""); res.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("%s unauth: %d", path, res.StatusCode)
+		}
+	}
+	if res := post(t, srv, "/exec", "", `{"line":"status"}`, ""); res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("exec unauth: %d", res.StatusCode)
+	}
+}

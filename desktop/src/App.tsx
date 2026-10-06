@@ -41,23 +41,23 @@ export default function App() {
     )
   }
 
-  if (workspace.isError) {
-    return (
-      <Shell onRefresh={refresh} refreshing={workspace.isFetching}>
-        <StatusAlert error={toApiError(workspace.error)} />
-      </Shell>
-    )
-  }
-
+  // Once a workspace is on screen it stays: a failed background refetch is shown inline.
   if (workspace.data && config.data) {
     return (
       <WorkspaceView
         workspace={workspace.data}
         apiUrl={config.data.url}
         apiToken={config.data.token}
-        onRefresh={refresh}
-        refreshing={workspace.isFetching}
+        error={workspace.isError ? toApiError(workspace.error).message : null}
       />
+    )
+  }
+
+  if (workspace.isError) {
+    return (
+      <Shell onRefresh={refresh} refreshing={workspace.isFetching}>
+        <StatusAlert error={toApiError(workspace.error)} />
+      </Shell>
     )
   }
 

@@ -1,3 +1,4 @@
+import { pointerWithin, type CollisionDetection } from "@dnd-kit/core"
 import type { Placement } from "./api"
 
 export type DragKind = "file" | "commit" | "branch"
@@ -92,4 +93,25 @@ export function dropHint(source: DragItem | null, target: DropTarget): string | 
     case "uncommit":
       return "Uncommit to Unstaged"
   }
+}
+
+/**
+ * innermostAcceptingDroppable is the workspace's collision detection. Of the droppables
+ * under the pointer it keeps those that accept the dragged item (resolveDrop) and picks
+ * the smallest, so a commit row inside a branch card always wins over the card, and a
+ * commit dragged over a commit (no drop) falls through to its branch. It never falls
+ * back to the nearest droppable: empty space is no target, so `over` can't jump around.
+ */
+export const innermostAcceptingDroppable: CollisionDetection = (args) => {
+  const source = args.active.data.current as DragItem | undefined
+  if (!source) return []
+  const pointed = pointerWithin(args)
+  const accepting = pointed.flatMap((c) => {
+    const container = args.droppableContainers.find((d) => d.id === c.id)
+    const target = container?.data.current as DropTarget | undefined
+    const rect = args.droppableRects.get(c.id)
+    if (!target || !rect || target.id === source.id || !resolveDrop(source, target)) return []
+    return [{ id: c.id, data: { ...c.data, value: rect.width * rect.height } }]
+  })
+  return accepting.sort((a, b) => a.data.value - b.data.value)
 }

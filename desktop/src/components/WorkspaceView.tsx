@@ -1,199 +1,234 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState, type MouseEvent } from "react"
 import {
   DndContext,
   DragOverlay,
+  MeasuringStrategy,
   PointerSensor,
-  closestCorners,
-  pointerWithin,
   useSensor,
   useSensors,
-  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
+  type Modifier,
 } from "@dnd-kit/core"
+import { getEventCoordinates } from "@dnd-kit/utilities"
+import { CommandIcon, RefreshCwIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Kbd } from "@/components/ui/kbd"
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
-import { ApiRequestError, type Workspace } from "@/api"
-import { resolveDrop, type DragItem, type DropTarget } from "@/dnd"
-import { useDiff, useWorkspaceOps } from "@/queries"
+import type { Workspace } from "@/api"
+import { ActionsProvider } from "@/actions/ActionsProvider"
+import { toastError } from "@/actions/toast"
+import { commitInto } from "@/actions/builtin"
+import { useActions } from "@/actions/context"
+import { formatKey } from "@/actions/keys"
+import { ids } from "@/actions/registry"
 import {
+  innermostAcceptingDroppable,
+  resolveDrop,
+  type DragItem,
+  type DropTarget,
+} from "@/dnd"
+import { holdRefetch, useDiff, useRefreshing, useWorkspaceOps, type WorkspaceOps } from "@/queries"
+import {
+  describeSubjects,
   selectionDiffId,
+  useSelectionModel,
   type Selection,
+  type SelectionModel,
 } from "@/selection"
-import { CommitDialog } from "./CommitDialog"
 import { DiffPane } from "./DiffPane"
 import { StackLanes } from "./StackLanes"
 import { UnstagedPanel } from "./UnstagedPanel"
 
-/** Prefer the droppable under the pointer; fall back to nearest corners. */
-const workspaceCollision: CollisionDetection = (args) => {
-  const pointed = pointerWithin(args)
-  if (pointed.length > 0) {
-    return pointed
+/** besideCursor draws the drag overlay just below-right of the pointer, clear of drop hints. */
+const besideCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+  const p = activatorEvent && getEventCoordinates(activatorEvent)
+  if (!p || !draggingNodeRect) return transform
+  return {
+    ...transform,
+    x: transform.x + p.x - draggingNodeRect.left + 14,
+    y: transform.y + p.y - draggingNodeRect.top + 14,
   }
-  return closestCorners(args)
 }
 
 type Props = {
   workspace: Workspace
   apiUrl: string
   apiToken: string
-  onRefresh: () => void
-  refreshing?: boolean
+  /** A background refetch failed; the last good workspace stays on screen. */
+  error?: string | null
 }
 
-type PendingCommit = {
-  changes: string[]
-  placement: { branch?: string; newBranch?: boolean }
-  label: string
-}
-
-export function WorkspaceView({
-  workspace,
-  apiUrl,
-  apiToken,
-  onRefresh,
-  refreshing,
-}: Props) {
-  const [selection, setSelection] = useState<Selection | null>({ kind: "unstaged" })
-  const [activeDrag, setActiveDrag] = useState<DragItem | null>(null)
-  const [pendingCommit, setPendingCommit] = useState<PendingCommit | null>(null)
+export function WorkspaceView({ workspace, apiUrl, apiToken, error }: Props) {
+  const sel = useSelectionModel(workspace)
   const ops = useWorkspaceOps(apiUrl, apiToken)
-  const diffId = selectionDiffId(selection)
-  const diff = useDiff(apiUrl, apiToken, diffId)
+  return (
+    <ActionsProvider workspace={workspace} sel={sel} ops={ops}>
+      <WorkspaceScreen workspace={workspace} sel={sel} ops={ops} error={error} />
+    </ActionsProvider>
+  )
+}
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+function WorkspaceScreen({
+  workspace,
+  sel,
+  ops,
+  error,
+}: {
+  workspace: Workspace
+  sel: SelectionModel
+  ops: WorkspaceOps
+  error?: string | null
+}) {
+  const actions = useActions()
+  const [activeDrag, setActiveDrag] = useState<DragItem | null>(null)
+  const releaseRefetch = useRef<(() => void) | null>(null)
+  const refreshing = useRefreshing(ops.cfg.url)
+  const diff = useDiff(ops.cfg.url, ops.cfg.token, selectionDiffId(sel.selection))
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  const repoName = useMemo(
+    () => workspace.repo.split(/[/\\]/).filter(Boolean).pop() ?? workspace.repo,
+    [workspace.repo],
   )
 
-  const repoName = useMemo(() => {
-    return workspace.repo.split(/[/\\]/).filter(Boolean).pop() ?? workspace.repo
-  }, [workspace.repo])
+  function onItemClick(item: Selection, e: MouseEvent) {
+    if (e.metaKey || e.ctrlKey) {
+      const err = sel.toggleMark(item)
+      if (err) toast.message(err)
+      return
+    }
+    sel.clearMarks()
+    sel.select(item)
+  }
+
+  /** dragSources: dragging a marked item drags all marks, as acting on marks does in the TUI. */
+  function dragSources(source: DragItem): string[] {
+    const marked = sel.marks.some((m) => m.kind !== "unstaged" && m.kind === source.kind && m.id === source.id)
+    return marked ? ids(sel.marks) : [source.id]
+  }
 
   async function runDrop(source: DragItem, target: DropTarget) {
     const action = resolveDrop(source, target)
-    if (!action) {
-      toast.message(`Cannot drop ${source.kind} onto ${target.kind}`)
-      return
+    if (!action) return
+    const sources = dragSources(source)
+    const ctx = actions.contextFor()
+    const what = sources.length > 1 ? `${sources.length} ${source.kind}s` : source.label
+    switch (action.type) {
+      case "commit":
+        return commitInto(ctx, sources, action.placement)
+      case "amend":
+        await ctx.runOp(`Amended ${what} into “${target.label}”`, () =>
+          ops.run("amend", { target: action.target, changes: sources }),
+        )
+        return
+      case "move":
+        await ctx.runOp(
+          action.placement.newBranch ? "Moved onto a new branch" : `Moved onto ${action.placement.branch}`,
+          () => ops.run("move", { sources, placement: action.placement }),
+        )
+        return
+      case "uncommit":
+        await ctx.runOp(`Uncommitted ${what}`, () => ops.run("uncommit", { sources }))
+        return
     }
-    try {
-      switch (action.type) {
-        case "commit":
-          setPendingCommit({
-            changes: [source.id],
-            placement: action.placement,
-            label: action.placement.newBranch
-              ? "a new branch"
-              : action.placement.branch ?? "branch",
-          })
-          return
-        case "amend":
-          await ops.amend.mutateAsync({
-            target: action.target,
-            changes: [source.id],
-          })
-          toast.success(`Amended into commit`)
-          break
-        case "move":
-          await ops.move.mutateAsync({
-            sources: [source.id],
-            placement: action.placement,
-          })
-          toast.success(
-            action.placement.newBranch
-              ? "Moved onto a new branch"
-              : `Moved onto ${action.placement.branch}`,
-          )
-          break
-        case "uncommit":
-          await ops.uncommit.mutateAsync({ sources: [source.id] })
-          toast.success("Uncommitted")
-          break
-      }
-    } catch (err) {
-      toastError(err)
-    }
+  }
+
+  function endDrag() {
+    setActiveDrag(null)
+    releaseRefetch.current?.()
+    releaseRefetch.current = null
   }
 
   function onDragStart(event: DragStartEvent) {
     const data = event.active.data.current as DragItem | undefined
-    if (data?.kind && data.id) {
-      setActiveDrag(data)
-    }
+    if (!data?.kind || !data.id) return
+    releaseRefetch.current?.()
+    releaseRefetch.current = holdRefetch()
+    setActiveDrag(data)
   }
 
   function onDragEnd(event: DragEndEvent) {
     const source = event.active.data.current as DragItem | undefined
-    const overData = event.over?.data.current as DropTarget | undefined
-    setActiveDrag(null)
-    if (!source?.kind || !overData?.kind || ops.busy) {
+    const target = event.over?.data.current as DropTarget | undefined
+    endDrag()
+    if (!source?.kind || !target?.kind) return
+    if (ops.busy) {
+      toast.message("Wait for the running operation to finish")
       return
     }
-    void runDrop(source, overData)
+    void runDrop(source, target).catch(toastError)
   }
 
-  async function confirmCommit(message: string) {
-    if (!pendingCommit) return
-    try {
-      await ops.commit.mutateAsync({
-        changes: pendingCommit.changes,
-        message,
-        placement: pendingCommit.placement,
-      })
-      toast.success(`Committed to ${pendingCommit.label}`)
-      setPendingCommit(null)
-    } catch (err) {
-      toastError(err)
-    }
-  }
+  const marked = sel.marks.length
 
   return (
     <div className="flex h-svh flex-col">
       <header className="flex items-center justify-between gap-3 border-b px-4 py-2">
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground">buti desktop</p>
-          <h1 className="truncate font-heading text-base font-medium tracking-tight">
-            {repoName}
-          </h1>
+          <h1 className="truncate font-heading text-base font-medium tracking-tight">{repoName}</h1>
         </div>
         <div className="flex items-center gap-2">
+          {marked > 0 ? (
+            <span className="text-xs text-muted-foreground" data-testid="marks">
+              {describeSubjects(sel.marks)} marked
+            </span>
+          ) : null}
           {workspace.upstreamState?.behind ? (
             <span className="text-xs text-muted-foreground">
               upstream +{workspace.upstreamState.behind}
             </span>
           ) : null}
+          <Button variant="ghost" size="sm" onClick={() => actions.openPalette("all")}>
+            <CommandIcon />
+            Commands
+            <Kbd>{formatKey("mod+k")}</Kbd>
+          </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={onRefresh}
-            disabled={refreshing || ops.busy}
+            onClick={() => void ops.refresh({ sync: true }).catch(toastError)}
+            disabled={refreshing}
           >
+            <RefreshCwIcon className={refreshing ? "animate-spin" : undefined} />
             Refresh
           </Button>
         </div>
       </header>
 
+      {error ? (
+        <Alert variant="destructive" className="mx-4 mt-3 w-auto">
+          <AlertTitle>Could not refresh the workspace</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+
       {workspace.resolving ? (
-        <Alert className="mx-4 mt-3">
+        <Alert className="mx-4 mt-3 w-auto">
           <AlertTitle>Resolving a conflicted commit</AlertTitle>
           <AlertDescription>
-            {(workspace.resolving.conflicted_files?.length ?? 0)} conflicted,{" "}
-            {(workspace.resolving.resolved_files?.length ?? 0)} resolved.
+            {workspace.resolving.conflicted_files?.length ?? 0} conflicted,{" "}
+            {workspace.resolving.resolved_files?.length ?? 0} resolved.
           </AlertDescription>
         </Alert>
       ) : null}
 
       <DndContext
         sensors={sensors}
-        collisionDetection={workspaceCollision}
+        collisionDetection={innermostAcceptingDroppable}
+        // Measure droppables once per drag; hover feedback never changes layout, so the
+        // rects stay valid and `over` can't oscillate.
+        measuring={{ droppable: { strategy: MeasuringStrategy.BeforeDragging } }}
         onDragStart={onDragStart}
-        onDragCancel={() => setActiveDrag(null)}
+        onDragCancel={endDrag}
         onDragEnd={onDragEnd}
       >
         <ResizablePanelGroup orientation="vertical" className="min-h-0 flex-1">
@@ -202,8 +237,8 @@ export function WorkspaceView({
               <ResizablePanel defaultSize={240} minSize={180} maxSize={420}>
                 <UnstagedPanel
                   changes={workspace.uncommittedChanges}
-                  selection={selection}
-                  onSelect={setSelection}
+                  sel={sel}
+                  onItemClick={onItemClick}
                   activeDrag={activeDrag}
                   disabled={ops.busy}
                 />
@@ -212,8 +247,8 @@ export function WorkspaceView({
               <ResizablePanel defaultSize="78" minSize="40">
                 <StackLanes
                   stacks={workspace.stacks}
-                  selection={selection}
-                  onSelect={setSelection}
+                  sel={sel}
+                  onItemClick={onItemClick}
                   activeDrag={activeDrag}
                   disabled={ops.busy}
                 />
@@ -223,50 +258,24 @@ export function WorkspaceView({
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize="42" minSize="20">
             <DiffPane
-              selection={selection}
+              selection={sel.selection}
               diff={diff.data}
-              loading={diff.isPending || diff.isFetching}
-              error={
-                diff.isError
-                  ? diff.error instanceof Error
-                    ? diff.error.message
-                    : "Could not load diff"
-                  : null
-              }
+              loading={diff.isPending && diff.fetchStatus !== "idle"}
+              stale={diff.isPlaceholderData}
+              error={diff.isError ? (diff.error instanceof Error ? diff.error.message : "Could not load diff") : null}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={null} modifiers={[besideCursor]}>
           {activeDrag ? (
-            <div className="rounded-md border bg-card px-3 py-1.5 text-xs shadow-md">
-              {activeDrag.label}
+            <div className="w-fit max-w-64 truncate rounded-md border bg-card px-3 py-1.5 text-xs shadow-md">
+              {dragSources(activeDrag).length > 1
+                ? `${dragSources(activeDrag).length} ${activeDrag.kind}s`
+                : activeDrag.label}
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
-
-      <CommitDialog
-        open={pendingCommit !== null}
-        title="Commit"
-        description={
-          pendingCommit
-            ? `Commit onto ${pendingCommit.label}. The change goes through but, not git.`
-            : ""
-        }
-        pending={ops.commit.isPending}
-        onOpenChange={(open) => {
-          if (!open) setPendingCommit(null)
-        }}
-        onConfirm={(msg) => void confirmCommit(msg)}
-      />
     </div>
   )
-}
-
-function toastError(err: unknown) {
-  if (err instanceof ApiRequestError) {
-    toast.error(err.message)
-    return
-  }
-  toast.error(err instanceof Error ? err.message : "Operation failed")
 }
