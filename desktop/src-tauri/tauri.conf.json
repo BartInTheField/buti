@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Buti",
+  "productName": "buti",
   "version": "0.1.0",
   "identifier": "com.bartinthefield.buti.desktop",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Buti",
+        "title": "buti",
         "width": 960,
         "height": 720,
         "resizable": true

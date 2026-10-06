@@ -48,6 +48,7 @@ import {
 import { EditModePanel } from "./conflicts/EditModePanel"
 import { BranchesLayer, HistoryButtons, UpstreamButton } from "./branches/BranchesLayer"
 import { DetailsLayout } from "./details/DetailsLayout"
+import { BrandLogo } from "./BrandMark"
 import { DiffPane } from "./DiffPane"
 import { cancelTarget } from "./target/store"
 import { TargetModeProvider } from "./target/TargetModeProvider"
@@ -170,9 +171,10 @@ function WorkspaceScreen({
   return (
     <div className="flex h-svh flex-col">
       <header className="flex items-center justify-between gap-3 border-b px-4 py-2">
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">buti desktop</p>
-          <h1 className="truncate font-heading text-base font-medium tracking-tight">{repoName}</h1>
+        <div className="flex min-w-0 items-center gap-3">
+          <BrandLogo />
+          <span className="h-4 w-px shrink-0 bg-border" aria-hidden="true" />
+          <h1 className="truncate font-heading text-sm font-medium tracking-tight">{repoName}</h1>
         </div>
         <div className="flex items-center gap-2">
           {marked > 0 ? (
