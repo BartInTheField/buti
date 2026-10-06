@@ -39,7 +39,7 @@ import { selectionKey, selectionTitle, type Selection } from "@/selection"
 import { CommentComposer } from "./review/CommentComposer"
 import { CommentThread } from "./review/CommentThread"
 import { isOpen, useComments, type LocatedComment } from "./review/api"
-import { moveToLines } from "./review/locate"
+import { fileOf, moveToLines } from "./review/locate"
 import { DiffContextMenu } from "./details/DiffContextMenu"
 import { FileTree } from "./details/FileTree"
 import { HintButton } from "./details/HintButton"
@@ -134,7 +134,7 @@ export function DiffPane({ selection, diff, loading, stale, error }: Props) {
   const base = useMemo(() => (diff ? layoutDiff(diff, uncommitted) : null), [diff, uncommitted])
   const notes = useMemo(() => {
     if (!diff) return []
-    const fileDiff = (path: string) => diff.changes.find((f) => f.path === path)
+    const fileDiff = (path: string) => fileOf(diff, path)
     return notesShown(comments.data ?? [], JSON.parse(shownId) as Shown, view.hideResolved, fileDiff, moveToLines)
   }, [diff, comments.data, shownId, view.hideResolved])
   const layout = useMemo(() => (base ? withComments(base, notes) : null), [base, notes])

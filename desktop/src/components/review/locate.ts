@@ -1,8 +1,18 @@
-import type { FileDiff } from "@/api"
+import type { Diff, FileDiff } from "@/api"
 import type { Anchor } from "./api"
 
 // A port of the line matching in internal/review/locate.go, for showing a commit's
 // comments on its branch's whole diff (internal/ui notesShown).
+
+/**
+ * fileOf is the diff of path with every hunk (but.Diff.File). An uncommitted diff lists one
+ * entry per hunk, so the first entry for a path holds only its first hunk.
+ */
+export function fileOf(diff: Diff, path: string): FileDiff | undefined {
+  const fs = diff.changes.filter((f) => f.path === path)
+  if (fs.length <= 1) return fs[0]
+  return { ...fs[0], diff: { ...fs[0].diff, hunks: fs.flatMap((f) => f.diff.hunks ?? []) } }
+}
 
 type SideLine = { text: string; changed: boolean }
 
