@@ -4,6 +4,7 @@ import { useActions } from "@/actions/context"
 import { formatKey } from "@/actions/keys"
 import { allActions } from "@/actions/registry"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { OplogSheet } from "./OplogSheet"
 import { PullRequestDialog } from "./PullRequestDialog"
@@ -64,15 +65,24 @@ export function HistoryButtons() {
   )
 }
 
-/** UpstreamButton shows how far the target is ahead and pulls it on click (L). */
-export function UpstreamButton({ behind }: { behind: number }) {
+/** UpstreamButton shows how far the target is ahead and pulls it on click (L); it spins while pulling. */
+export function UpstreamButton({ behind, pulling }: { behind: number; pulling?: boolean }) {
   const run = useRunAction()
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => run("branch.pull")}>
-          <ArrowDownToLineIcon />
-          upstream +{behind}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground"
+          // aria-disabled, not disabled: a disabled button gets no hover, so the tooltip would vanish.
+          aria-disabled={pulling}
+          aria-busy={pulling}
+          data-testid="upstream-button"
+          onClick={() => !pulling && run("branch.pull")}
+        >
+          {pulling ? <Spinner aria-hidden="true" /> : <ArrowDownToLineIcon />}
+          {pulling ? "Pulling…" : `upstream +${behind}`}
         </Button>
       </TooltipTrigger>
       <TooltipContent>Pull (update from upstream) · {formatKey("L")}</TooltipContent>

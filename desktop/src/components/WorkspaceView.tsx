@@ -38,7 +38,7 @@ import {
   type DropTarget,
 } from "@/dnd"
 import { entityFor } from "@/target"
-import { holdRefetch, useDiff, useRefreshing, useWorkspaceOps, type WorkspaceOps } from "@/queries"
+import { holdRefetch, useDiff, useOpPending, useRefreshing, useWorkspaceOps, type WorkspaceOps } from "@/queries"
 import {
   describeSubjects,
   selectionDiffId,
@@ -104,6 +104,7 @@ function WorkspaceScreen({
   const [activeDrag, setActiveDrag] = useState<DragItem | null>(null)
   const releaseRefetch = useRef<(() => void) | null>(null)
   const refreshing = useRefreshing(ops.cfg.url)
+  const pulling = useOpPending(ops.cfg.url, "pull")
   const diff = useDiff(ops.cfg.url, ops.cfg.token, selectionDiffId(sel.selection))
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
@@ -181,8 +182,9 @@ function WorkspaceScreen({
               {describeSubjects(sel.marks)} marked
             </Badge>
           ) : null}
-          {workspace.upstreamState?.behind ? (
-            <UpstreamButton behind={workspace.upstreamState.behind} />
+          {/* Also shown while pulling, so L shows its progress when the target looked up to date. */}
+          {workspace.upstreamState?.behind || pulling ? (
+            <UpstreamButton behind={workspace.upstreamState?.behind ?? 0} pulling={pulling} />
           ) : null}
           <HistoryButtons />
           <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden="true" />
@@ -240,6 +242,7 @@ function WorkspaceScreen({
               <ResizablePanel defaultSize="78" minSize="40">
                 <StackLanes
                   stacks={workspace.stacks}
+                  url={ops.cfg.url}
                   sel={sel}
                   onItemClick={onItemClick}
                   activeDrag={activeDrag}

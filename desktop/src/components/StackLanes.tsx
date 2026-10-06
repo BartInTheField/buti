@@ -1,7 +1,9 @@
 import { useState, type MouseEvent, type PointerEvent } from "react"
 import { useDraggable, useDroppable } from "@dnd-kit/core"
-import { GitBranchIcon, PlusIcon } from "lucide-react"
-import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame"
+import { ArrowUpIcon, GitBranchIcon, PlusIcon } from "lucide-react"
+import { Frame, FrameFooter, FrameHeader, FramePanel } from "@/components/reui/frame"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { IconTile } from "@/components/reui/icon-tile"
 import { Timeline, TimelineIndicator, TimelineItem, TimelineSeparator } from "@/components/reui/timeline"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -12,6 +14,8 @@ import { useActions } from "@/actions/context"
 import { allActions } from "@/actions/registry"
 import { BranchBadges } from "./branches/BranchBadges"
 import { BranchMenu } from "./branches/BranchMenu"
+import { canPush } from "./branches/format"
+import { useOpPending } from "@/queries"
 import { dropHint, type DragItem, type DropTarget } from "@/dnd"
 import { sameSelection, type Selection, type SelectionModel } from "@/selection"
 import { CommittedFiles } from "./details/CommittedFiles"
@@ -30,6 +34,8 @@ import {
 
 type Props = {
   stacks: Stack[]
+  /** The API url, to tell which branch is being pushed. */
+  url: string
   sel: SelectionModel
   onItemClick: (item: Selection, e: MouseEvent) => void
   activeDrag: DragItem | null
@@ -41,7 +47,7 @@ function laneKey(stack: Stack): string {
   return stack.branches.at(-1)?.name ?? stack.cliId
 }
 
-export function StackLanes({ stacks, sel, onItemClick, activeDrag, disabled }: Props) {
+export function StackLanes({ stacks, url, sel, onItemClick, activeDrag, disabled }: Props) {
   const [widths, setWidths] = useState<LaneWidths>(loadLaneWidths)
   function resize(key: string, w: number, persist: boolean) {
     setWidths((prev) => {
@@ -74,6 +80,7 @@ export function StackLanes({ stacks, sel, onItemClick, activeDrag, disabled }: P
                   <BranchCard
                     key={branch.cliId}
                     branch={branch}
+                    url={url}
                     sel={sel}
                     onItemClick={onItemClick}
                     activeDrag={activeDrag}
@@ -154,12 +161,14 @@ function useDropTarget(target: DropTarget, activeDrag: DragItem | null, disabled
 
 function BranchCard({
   branch,
+  url,
   sel,
   onItemClick,
   activeDrag,
   disabled,
 }: {
   branch: Branch
+  url: string
   sel: SelectionModel
   onItemClick: (item: Selection, e: MouseEvent) => void
   activeDrag: DragItem | null
@@ -234,7 +243,48 @@ function BranchCard({
           </Timeline>
         )}
       </FramePanel>
+      <FrameFooter className="flex-row px-1 py-1">
+        <PushButton branch={branch} url={url} />
+      </FrameFooter>
     </Frame>
+  )
+}
+
+/**
+ * PushButton is the Push button at the foot of a branch card, as in the TUI: it selects
+ * the branch and pushes it (P), and is greyed out when there is nothing to push. It spins
+ * while this branch is being pushed, however the push started.
+ */
+function PushButton({ branch, url }: { branch: Branch; url: string }) {
+  const actions = useActions()
+  const pushing = useOpPending(url, "push", (a) => a.branch === branch.name)
+  const pushable = canPush(branch.branchStatus)
+
+  function push() {
+    if (pushing) return
+    const item: Selection = { kind: "branch", id: branch.cliId, name: branch.name }
+    const { sel } = actions.contextFor()
+    sel.clearMarks()
+    sel.select(item)
+    const a = allActions().find((a) => a.id === "branch.push")
+    if (a) actions.run(a, actions.contextFor([item], []))
+  }
+
+  return (
+    <Button
+      size="xs"
+      variant={pushable || pushing ? "default" : "secondary"}
+      data-testid="push-button"
+      aria-busy={pushing}
+      // Not disabled while pushing, which would fade it: the spinner should read at full strength.
+      aria-disabled={pushing}
+      disabled={!pushable && !pushing}
+      title={pushing ? `Pushing ${branch.name}` : pushable ? `Push ${branch.name} \u00b7 P` : "Nothing to push"}
+      onClick={push}
+    >
+      {pushing ? <Spinner aria-hidden="true" /> : <ArrowUpIcon />}
+      {pushing ? "Pushing\u2026" : "Push"}
+    </Button>
   )
 }
 

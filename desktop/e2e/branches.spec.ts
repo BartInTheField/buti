@@ -141,6 +141,70 @@ test("P on a pushed branch says there is nothing to push", async ({ page }) => {
   await expect(page.getByText("api has nothing to push")).toBeVisible()
 })
 
+/** loadingShot screenshots a spinner, which never settles, so it skips settle. */
+async function loadingShot(page: Page, name: string) {
+  await page.screenshot({ path: `${shots}/${name}.png`, animations: "disabled" })
+}
+
+/**
+ * hold answers `POST <path>` only once release is called, so a test can look at the loading
+ * state. The op never reaches `but`, so the fixture's remote is left alone.
+ */
+async function hold(page: Page, path: string) {
+  let release = () => {}
+  const gate = new Promise<void>((r) => (release = r))
+  await page.route(`**${path}`, async (route) => {
+    await gate
+    await route.fulfill({ json: { ok: true, output: "" } })
+  })
+  return release
+}
+
+test("branch cards have a Push button that spins while pushing", async ({ page }) => {
+  const push = card(page, "auth").getByTestId("push-button")
+  await expect(push).toBeEnabled()
+  await expect(push).toHaveText("Push")
+  // Nothing to push: greyed out, as in the TUI.
+  await expect(card(page, "api").getByTestId("push-button")).toBeDisabled()
+
+  const release = await hold(page, "/ops/push")
+  await push.click()
+  await expect(card(page, "auth")).toHaveClass(/ring-1/) // the click selects the branch
+  await expect(push).toHaveText("Pushing\u2026")
+  await expect(push).toHaveAttribute("aria-busy", "true")
+  // Only the branch being pushed spins.
+  await expect(card(page, "fix-typo").getByTestId("push-button")).toHaveText("Push")
+  await loadingShot(page, "pushing")
+
+  release()
+  await expect(page.getByText("Pushed auth")).toBeVisible()
+  await expect(push).toHaveText("Push")
+})
+
+test("P shows the same loading state on the card", async ({ page }) => {
+  const release = await hold(page, "/ops/push")
+  await selectBranch(page, "fix-typo")
+  await page.keyboard.press("P")
+  const push = card(page, "fix-typo").getByTestId("push-button")
+  await expect(push).toHaveText("Pushing\u2026")
+  release()
+  await expect(push).toHaveText("Push")
+})
+
+test("the upstream button spins while pulling", async ({ page }) => {
+  const release = await hold(page, "/ops/pull")
+  const upstream = page.getByTestId("upstream-button")
+  await expect(upstream).toHaveText(/upstream \+1/)
+  await upstream.click()
+  await expect(upstream).toHaveText("Pulling\u2026")
+  await expect(upstream).toHaveAttribute("aria-busy", "true")
+  await loadingShot(page, "pulling")
+
+  release()
+  await expect(page.getByText("Pulled upstream changes")).toBeVisible()
+  await expect(upstream).toHaveText(/upstream \+1/)
+})
+
 test("N asks for a pull request title, description and draft", async ({ page }) => {
   await selectBranch(page, "auth")
   await page.keyboard.press("N")

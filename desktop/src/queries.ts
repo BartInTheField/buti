@@ -3,6 +3,7 @@ import {
   keepPreviousData,
   useIsMutating,
   useMutation,
+  useMutationState,
   useQuery,
   useQueryClient,
   type QueryClient,
@@ -174,6 +175,22 @@ export function useWorkspaceOps(url: string, token: string): WorkspaceOps {
   }
 
   return { cfg, busy, run, refresh, invalidate }
+}
+
+/**
+ * useOpPending is true while the op `name` runs, optionally only for matching args, so a
+ * button shows its own loading state whether it was clicked or reached by key.
+ */
+export function useOpPending<K extends OpName>(
+  url: string,
+  name: K,
+  match?: (args: OpArgs<K>) => boolean,
+): boolean {
+  const running = useMutationState({
+    filters: { mutationKey: opKey(url), status: "pending" },
+    select: (m) => m.state.variables as { name: OpName; args: unknown } | undefined,
+  })
+  return running.some((v) => v?.name === name && (!match || match(v.args as OpArgs<K>)))
 }
 
 /** useRefreshing is true while a manual (synced) refresh runs, not during background polls. */
