@@ -49,6 +49,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "       buti [-C dir] desktop [--serve | --dev] [--app path]")
 		fmt.Fprintln(stderr, "       buti [-C dir] review <command> ...")
 		fmt.Fprintln(stderr, "       buti [-C dir] skill <command> ...")
+		fmt.Fprintln(stderr, "       buti [-C dir] lsp")
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr, "\nReview comments, for coding agents (no TUI):")
 		fmt.Fprintln(stderr, indentLines(reviewcli.Usage))
@@ -81,6 +82,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return runReview(abs, rest[1:], stdout, stderr)
 		case "skill":
 			return runSkill(abs, rest[1:], stdout, stderr)
+		case "lsp":
+			return runLSP(abs, rest[1:], os.Stdin, stdout, stderr)
 		}
 	}
 	if _, err := exec.LookPath("but"); err != nil {

@@ -1,0 +1,44 @@
+id = "buti"
+name = "buti"
+version = "0.1.0"
+schema_version = 1
+authors = ["Bart in 't Veld"]
+description = "GitButler review comments from buti as diagnostics"
+repository = "https://github.com/bartinthefield/buti"
+
+[language_servers.buti]
+name = "buti"
+languages = [
+    "C",
+    "C++",
+    "CSS",
+    "ERB",
+    "Elixir",
+    "GLSL",
+    "Go",
+    "Go Mod",
+    "Go Work",
+    "HEEx",
+    "HTML",
+    "JSON",
+    "JSONC",
+    "Java",
+    "JavaScript",
+    "Kotlin",
+    "Markdown",
+    "PHP",
+    "Plain Text",
+    "Proto",
+    "Python",
+    "Ruby",
+    "Rust",
+    "SQL",
+    "Shell Script",
+    "Svelte",
+    "Swift",
+    "TOML",
+    "TSX",
+    "TypeScript",
+    "Vue.js",
+    "YAML",
+]

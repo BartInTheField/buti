@@ -1,0 +1,3 @@
+/target
+# Zed writes the build here when the folder is installed as a dev extension.
+/extension.wasm
