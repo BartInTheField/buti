@@ -21,7 +21,8 @@ import (
 // Usage lists the subcommands, for `buti --help` and `buti review --help`.
 const Usage = `buti review list [--status open|resolved|dismissed|outdated|orphaned|all] [--author <name>] [--json]
 buti review show <id> [--json]
-buti review comment --file <path> --line <n> [--end-line <n>] [--side new|old] [--shortcode <id>] --body "<text>" [--author <name>]
+buti review comment --file <path> --line <n> [--end-line <n>] [--side new|old] [--shortcode <id>] [--worktree] [--body "<text>"] [--author <name>]
+  (--worktree counts --line in the file on disk; --body may be omitted in a terminal, which asks for it)
 buti review resolve <id> [--summary "<text>"]
 buti review reply <id> --body "<text>" [--author <name>]
 buti review dismiss <id> [--reason "<text>"]
@@ -35,6 +36,11 @@ type Env struct {
 	Stdout, Stderr io.Writer
 	Store          func() (*review.Store, error) // the comment store, opened only by commands that need it
 	But            review.Source                 // the workspace, for resolving shortcodes
+
+	// Stdin and IsTerminal are where an omitted --body is read from, and whether that is possible; nil means
+	// os.Stdin and whether it is a terminal.
+	Stdin      io.Reader
+	IsTerminal func() bool
 }
 
 // NeedsBut reports whether the subcommand in args reads the workspace through `but`.

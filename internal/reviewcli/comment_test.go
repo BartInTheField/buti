@@ -1,9 +1,12 @@
 package reviewcli
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/bartinthefield/buti/internal/editor"
 	"github.com/bartinthefield/buti/internal/review"
 )
 
@@ -180,5 +183,175 @@ func TestCommentErrors(t *testing.T) {
 	}
 	if !NeedsBut([]string{"comment"}) {
 		t.Error("comment reads the workspace but does not say so")
+	}
+}
+
+// writeFile puts a working-copy file in the repository directory of the fake `but`.
+func (h *harness) writeFile(path, content string) string {
+	h.t.Helper()
+	p := filepath.Join(h.but.Dir, path)
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		h.t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+		h.t.Fatal(err)
+	}
+	return p
+}
+
+const readmeWork = "# demo\n\nA small service.\n\n## Usage\n\n    go run ./src\n"
+
+// The working copy of token.go has two lines more on top than the commits, so its line numbers differ from theirs.
+const tokenWork = "// one\n// two\npackage auth\n\n" + tokenLine + "\n// Token is for tests.\n"
+
+func TestCommentWorktree(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		file string
+		args []string
+		want review.Anchor
+		out  string
+	}{
+		{
+			name: "an uncommitted line",
+			file: "README.md",
+			args: []string{"--file", "README.md", "--line", "5"},
+			want: review.Anchor{Kind: review.KindUnassigned, Path: "README.md", Side: review.SideNew, Line: 5, EndLine: 5,
+				LineText: "## Usage"},
+			out: "on zz README.md:5",
+		},
+		{
+			// Line 5 here is line 3 in the commit that adds it; the newer commit only has it as context.
+			name: "a line only in a commit",
+			file: "src/auth/token.go",
+			args: []string{"--file", "src/auth/token.go", "--line", "5"},
+			want: review.Anchor{Kind: review.KindCommit, ChangeID: "change-token", CommitID: "0123456789abcdef",
+				Branch: "auth", Path: "src/auth/token.go", Side: review.SideNew, Line: 3, EndLine: 3, LineText: tokenLine},
+			out: "on knl src/auth/token.go:3",
+		},
+		{
+			name: "a line the newer commit adds",
+			file: "src/auth/token.go",
+			args: []string{"--file", "src/auth/token.go", "--line", "6"},
+			want: review.Anchor{Kind: review.KindCommit, ChangeID: "change-tidy", CommitID: "fedcba9876543210",
+				Branch: "auth", Path: "src/auth/token.go", Side: review.SideNew, Line: 4, EndLine: 4,
+				LineText: "// Token is for tests."},
+			out: "on tdy src/auth/token.go:4",
+		},
+		{
+			name: "a range in a commit",
+			file: "src/auth/token.go",
+			args: []string{"--file", "src/auth/token.go", "--line", "3", "--end-line", "5"},
+			want: review.Anchor{Kind: review.KindCommit, ChangeID: "change-token", CommitID: "0123456789abcdef",
+				Branch: "auth", Path: "src/auth/token.go", Side: review.SideNew, Line: 1, EndLine: 3,
+				LineText: "package auth\n\n" + tokenLine},
+			out: "on knl src/auth/token.go:1-3",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.writeFile("README.md", readmeWork)
+			h.writeFile("src/auth/token.go", tokenWork)
+			c := h.comment(append(tc.args, "--worktree", "--body", "Look")...)
+			if c.Anchor != tc.want {
+				t.Errorf("anchor\n got  %+v\n want %+v", c.Anchor, tc.want)
+			}
+			if !strings.Contains(h.stdout.String(), tc.out) {
+				t.Errorf("printed %q, want %q", h.stdout.String(), tc.out)
+			}
+		})
+	}
+}
+
+func TestCommentWorktreeErrors(t *testing.T) {
+	h := newHarness(t)
+	h.writeFile("README.md", readmeWork)
+	h.writeFile("src/auth/token.go", tokenWork)
+	h.writeFile("other.go", "package other\n")
+	for _, tc := range []struct {
+		args []string
+		code int
+		msg  string
+	}{
+		{[]string{"--file", "other.go", "--line", "1"}, 1, "other.go:1 is not part of any change in the workspace"},
+		{[]string{"--file", "src/auth/token.go", "--line", "1"}, 1, "src/auth/token.go:1 is not part of any change"},
+		{[]string{"--file", "README.md", "--line", "20"}, 1, "README.md has 7 lines, not 20"},
+		{[]string{"--file", "README.md", "--line", "1", "--side", "old"}, 2, "--worktree counts lines"},
+		{[]string{"--file", "README.md", "--line", "1", "--shortcode", "zz"}, 2, "drop --shortcode"},
+	} {
+		code := h.run(append([]string{"comment", "--worktree", "--body", "x"}, tc.args...)...)
+		if code != tc.code || !strings.Contains(h.stderr.String(), tc.msg) {
+			t.Errorf("%v: exit %d, stderr %q; want exit %d with %q", tc.args, code, h.stderr.String(), tc.code, tc.msg)
+		}
+	}
+	if cs, _ := h.store.List(); len(cs) != 0 {
+		t.Errorf("a failed comment was stored: %+v", cs)
+	}
+}
+
+func TestCommentAbsoluteFile(t *testing.T) {
+	h := newHarness(t)
+	p := h.writeFile("README.md", readmeWork)
+	for _, args := range [][]string{{"--worktree"}, {}} {
+		c := h.comment(append([]string{"--file", p, "--line", "5", "--body", "x"}, args...)...)
+		if c.Anchor.Path != "README.md" || c.Anchor.Kind != review.KindUnassigned || c.Anchor.LineText != "## Usage" {
+			t.Errorf("%v: anchor %+v", args, c.Anchor)
+		}
+	}
+	other := filepath.Join(t.TempDir(), "README.md")
+	if code := h.run("comment", "--file", other, "--line", "5", "--body", "x"); code != 1 ||
+		!strings.Contains(h.stderr.String(), "is outside the repository") {
+		t.Errorf("outside the repository: exit %d, stderr %q", code, h.stderr.String())
+	}
+}
+
+func TestCommentPrompt(t *testing.T) {
+	h := newHarness(t)
+	h.stdin = strings.NewReader("[nit] First line\nsecond line\n\nignored\n")
+	c := h.comment("--file", "README.md", "--line", "5")
+	if c.Body != "[nit] First line\nsecond line" || c.Anchor.Line != 5 {
+		t.Errorf("comment %+v", c)
+	}
+	if want := "Comment on README.md:5 (end with an empty line; empty to cancel):"; !strings.Contains(h.stderr.String(), want) {
+		t.Errorf("prompt %q, want %q", h.stderr.String(), want)
+	}
+
+	// EOF ends the comment too.
+	h.stdin = strings.NewReader("no newline")
+	if c := h.comment("--file", "README.md", "--line", "5"); c.Body != "no newline" {
+		t.Errorf("body %q", c.Body)
+	}
+
+	h.stdin = strings.NewReader("\n")
+	before, _ := h.store.List()
+	if code := h.run("comment", "--file", "README.md", "--line", "5"); code != 0 || !strings.Contains(h.stderr.String(), "cancelled") {
+		t.Errorf("cancel: exit %d, stderr %q", code, h.stderr.String())
+	}
+	if after, _ := h.store.List(); len(after) != len(before) {
+		t.Errorf("a cancelled comment was stored")
+	}
+
+	// Not a terminal: --body is required, as before.
+	h.stdin = nil
+	if code := h.run("comment", "--file", "README.md", "--line", "5"); code != 2 || !strings.Contains(h.stderr.String(), "--body is required") {
+		t.Errorf("no terminal: exit %d, stderr %q", code, h.stderr.String())
+	}
+}
+
+// A comment left in the editor on a copy that buti's diff (`Z`) wrote counts its lines in the change it was copied
+// from, not the working copy.
+func TestCommentOnDiffCopy(t *testing.T) {
+	h := newHarness(t)
+	h.writeFile("src/auth/token.go", tokenWork)
+	tmp := t.TempDir()
+	if err := editor.WriteSource(tmp, editor.Source{Commit: "0123456789abcdef"}); err != nil {
+		t.Fatal(err)
+	}
+	copied := filepath.Join(tmp, "0123456", "new", "src", "auth", "token.go")
+	c := h.comment("--file", copied, "--line", "3", "--worktree", "--body", "Look")
+	want := review.Anchor{Kind: review.KindCommit, ChangeID: "change-token", CommitID: "0123456789abcdef",
+		Branch: "auth", Path: "src/auth/token.go", Side: review.SideNew, Line: 3, EndLine: 3, LineText: tokenLine}
+	if c.Anchor != want {
+		t.Errorf("anchor\n got  %+v\n want %+v", c.Anchor, want)
 	}
 }
