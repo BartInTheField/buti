@@ -478,3 +478,116 @@ func TestE2ESidebarResize(t *testing.T) {
 	h.wantOnScreen("Unstaged", "README.md", "## Usage")
 	h.snap("narrow")
 }
+
+// zedPair runs `Z` and returns the old and new paths handed to `zed --diff`.
+func zedPair(t *testing.T, h *harness, started *[][]string, before int) (oldP, newP string) {
+	t.Helper()
+	h.keys("Z")
+	if len(*started) != before+1 {
+		t.Fatalf("started %q, want %d start(s)", *started, before+1)
+	}
+	args := (*started)[before]
+	if len(args) != 4 || args[0] != "zed" || args[1] != "--diff" {
+		t.Fatalf("args %q, want zed --diff OLD NEW", args)
+	}
+	return args[2], args[3]
+}
+
+func isDir(p string) bool {
+	st, err := os.Stat(p)
+	return err == nil && st.IsDir()
+}
+
+func TestE2EZedDiff(t *testing.T) {
+	started := detached(t)
+	t.Setenv("EDITOR", "zed")
+	t.Setenv("VISUAL", "")
+	h, r := newRepoHarness(t)
+	var tmps []string
+	t.Cleanup(func() {
+		for _, d := range tmps {
+			_ = os.RemoveAll(d)
+		}
+	})
+
+	// A commit: a directory pair, the added file empty on the old side.
+	h.selectText("Add token auth")
+	oldP, newP := zedPair(t, h, started, 0)
+	tmps = append(tmps, filepath.Dir(oldP))
+	if !isDir(oldP) || !isDir(newP) {
+		t.Fatalf("want directories, got %q %q", oldP, newP)
+	}
+	if b, err := os.ReadFile(filepath.Join(newP, "src/auth/token.go")); err != nil ||
+		string(b) != "package auth\n\nfunc Token() string { return \"secret\" }\n" {
+		t.Errorf("new token.go %q, %v", b, err)
+	}
+	if b, err := os.ReadFile(filepath.Join(oldP, "src/auth/token.go")); err != nil || len(b) != 0 {
+		t.Errorf("old token.go %q, %v; want an empty file", b, err)
+	}
+	h.wantOnScreen("Opened the diff of", "in Zed")
+	h.snap("zed-diff")
+	h.keys("?")
+	h.typeText("zed")
+	h.wantOnScreen("Open diff in Zed")
+	h.snap("help-zed")
+	h.keys("esc")
+
+	// A branch: one directory pair holding each changed file as of the tip.
+	h.selectText("fix-typo")
+	oldP, newP = zedPair(t, h, started, 1)
+	tmps = append(tmps, filepath.Dir(oldP))
+	if !isDir(oldP) || !isDir(newP) {
+		t.Fatalf("want directories, got %q %q", oldP, newP)
+	}
+	var tip string
+	for _, st := range h.status().Stacks {
+		for _, b := range st.Branches {
+			if b.Name == "fix-typo" {
+				tip = b.Commits[0].CommitID
+			}
+		}
+	}
+	nonEmpty := 0
+	err := filepath.WalkDir(newP, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(newP, p)
+		want, err := exec.Command("git", "-C", r.Dir, "show", tip+":"+filepath.ToSlash(rel)).Output()
+		if err != nil {
+			t.Errorf("git show %s: %v", rel, err)
+			return nil
+		}
+		got, _ := os.ReadFile(p)
+		if string(got) != string(want) {
+			t.Errorf("%s: %q, want %q", rel, got, want)
+		}
+		if len(got) > 0 {
+			nonEmpty++
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nonEmpty == 0 {
+		t.Errorf("no non-empty file under %s", newP)
+	}
+
+	// An uncommitted file: the worktree file on the right, the committed version on the left.
+	h.selectText("README.md")
+	oldP, newP = zedPair(t, h, started, 2)
+	tmps = append(tmps, filepath.Dir(filepath.Dir(oldP)))
+	work := filepath.Join(r.Dir, "README.md")
+	if newP != work {
+		t.Errorf("right side %q, want %q", newP, work)
+	}
+	oldB, err1 := os.ReadFile(oldP)
+	newB, err2 := os.ReadFile(work)
+	if err1 != nil || err2 != nil {
+		t.Fatalf("read: %v %v", err1, err2)
+	}
+	if string(oldB) == string(newB) {
+		t.Errorf("old side equals the worktree file %q", newB)
+	}
+}

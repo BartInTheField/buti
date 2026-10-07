@@ -209,8 +209,8 @@ func init() {
 				m.det.focused = false
 				return m.syncDetails(true)
 			}},
-		{key: "D", title: "Full-screen details", group: "View", global: true, when: always,
-			run: func(m *Model, _ []entity) tea.Cmd { return m.setDetailsFull(!m.det.full) }},
+		{key: "D", title: "Full-screen details (diff in Zed)", group: "View", global: true, when: always,
+			run: (*Model).fullDetails},
 		{key: "T", title: "Show / hide the file tree", group: "View", global: true,
 			when: func(m *Model, _ []entity) bool { return m.det.full },
 			run: func(m *Model, _ []entity) tea.Cmd {
@@ -218,10 +218,11 @@ func init() {
 				m.det.tree.focused = false
 				return nil
 			}},
-		{key: "o", title: "Open in $EDITOR", group: "View", when: one(entFile, entCommittedFile, entHunk),
-			run: func(m *Model, sel []entity) tea.Cmd {
-				return m.execInteractive("Edit "+sel[0].label, keepSelection, editorCommand(m.pathOf(sel[0])))
-			}},
+		{key: "o", title: "Open in editor", group: "View", when: one(entFile, entCommittedFile, entHunk),
+			run: func(m *Model, sel []entity) tea.Cmd { return m.openAt(sel[0]) }},
+		{key: "Z", title: "Open diff in Zed", group: "View",
+			when: zedDiffable,
+			run:  func(m *Model, sel []entity) tea.Cmd { return m.zedDiff(sel[0]) }},
 		{key: "O", title: "Open with default app", group: "View", when: one(entFile, entCommittedFile, entHunk),
 			run: func(m *Model, sel []entity) tea.Cmd {
 				if err := openExternal(m.pathOf(sel[0])); err != nil {

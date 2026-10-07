@@ -35,7 +35,7 @@ func (m *Model) openConflicted([]entity) tea.Cmd {
 	for _, p := range m.status.Resolving.Conflicted {
 		paths = append(paths, m.pathOf(entity{kind: entConflict, label: p}))
 	}
-	return m.execInteractive("Open conflicted files", keepSelection, editorCommand(paths...))
+	return m.openInEditor("conflicted files", 0, paths...)
 }
 
 func (m *Model) saveAndExit([]entity) tea.Cmd {

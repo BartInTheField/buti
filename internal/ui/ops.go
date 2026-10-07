@@ -2,7 +2,6 @@ package ui
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"runtime"
 	"time"
@@ -118,17 +117,6 @@ func (m *Model) startCommit(ids []string, at but.Placement, empty bool, desc str
 func (m *Model) openComposer(kind composeKind, desc, initial string, onSubmit func(*Model, string) tea.Cmd) tea.Cmd {
 	m.openModal(newComposer(kind, desc, initial, onSubmit))
 	return nil
-}
-
-func editorCommand(paths ...string) *exec.Cmd {
-	editor := os.Getenv("VISUAL")
-	if editor == "" {
-		editor = os.Getenv("EDITOR")
-	}
-	if editor == "" {
-		editor = "vi"
-	}
-	return exec.Command("sh", append([]string{"-c", editor + ` "$@"`, "editor"}, paths...)...)
 }
 
 // openURL opens a web page in the browser; tests replace it.
