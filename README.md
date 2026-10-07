@@ -71,6 +71,7 @@ Select something, press a verb (`c` commit, `r` squash/amend, `m` move, `p` cher
 - [Usage](docs/usage.md): flags, the select → verb → target flow, drag and drop, the mouse, review comments,
   `/buti-resolve` and `/buti-review`
 - [Resolving conflicts](docs/conflicts.md): fixing a conflicted commit in edit mode
+- [Zed](docs/zed.md): buti in a Zed tab, diffs in Zed, and review comments as diagnostics
 - [Keys](docs/keys.md): every key binding
 - [Development](docs/development.md): building, the code layout, releases
 - [Testing](docs/testing.md): unit tests, the test repository, end-to-end tests and screenshots, CI

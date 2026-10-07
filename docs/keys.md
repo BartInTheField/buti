@@ -20,7 +20,7 @@
 | `u` / `U` / `H` | undo / redo / operation history (restore any snapshot) |
 | `space` | mark (on **Unstaged**, marks every file) |
 | `f` / `F` | files in the commit / in every commit |
-| `d` / `D` / `+` `-` | details pane / full screen / resize (the pane, or full screen the file tree; the dividers can also be dragged) |
+| `d` / `D` / `+` `-` | details pane / full screen (in Zed's terminal: the [diff in Zed](zed.md#diffs-in-zed)) / resize (the pane, or full screen the file tree; the dividers can also be dragged) |
 | `T` | in full-screen details: show / hide the file tree (`+` / `-` or dragging its divider resizes it) |
 | `tab` | cycle focus: sidebar → lanes → details. In details: `j`/`k` move the line cursor (click a line to put it there), `J`/`K` scroll, `space` marks the cursor's hunk, then `c` / `r` / `x` on hunks. In full-screen details: `tab` (or `h` / `l`) moves between the file tree and the diff; in the tree `j`/`k` jump the diff to a file and `enter` folds a folder |
 | `[` / `]` | in details: previous / next hunk |
@@ -29,7 +29,8 @@
 | `e` / `d` / `x` | on a comment in details: edit / delete (after confirming) / resolve or reopen it |
 | `z` | show / hide resolved comments; **Review comments…** in the palette lists the open ones and jumps to them |
 | `y` / `Y` | copy (branch name, change id, path, hunk) / pick what to copy |
-| `o` / `O` | open a file in `$EDITOR` / with the default app; `o` on a branch with a pull request opens it in the browser |
+| `o` / `O` | open a file in your editor, at the cursor's line ([Zed](zed.md#open-files-at-the-line)) / with the default app; `o` on a branch with a pull request opens it in the browser |
+| `Z` | open the diff of a file, hunk, commit, branch or all uncommitted changes in [Zed](zed.md#diffs-in-zed) |
 | `/` / `t` | go to anything (fuzzy) / go to a branch |
 | `:` / `!` | run a `but` command (the output is shown) / a shell command |
 | `ctrl+p` | command palette (also holds commands without a key: **Version**, **Update buti**) |
