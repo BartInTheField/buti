@@ -53,3 +53,14 @@ jobs:
           name: screenshots
           path: ${{ runner.temp }}/screenshots
           if-no-files-found: ignore
+
+  # The Zed extension (editors/zed) builds to wasm, as Zed and the release do.
+  zed-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+          targets: wasm32-wasip2
+      - run: cargo build --manifest-path editors/zed/Cargo.toml --release --target wasm32-wasip2

@@ -41,15 +41,20 @@ The integration tests and the fixture need the [GitButler CLI](https://docs.gitb
   its moved line, and the outdated and orphaned statuses
 - `internal/reviewcli`: the `buti review` commands for coding agents, and the flat JSON they print
 - `internal/update`: finding the latest release and replacing the running binary
+- `internal/editor`: the user's editor (`o`), and the old and new copies for a diff in Zed (`Z`)
+- `internal/lsp`: `buti lsp`, the language server that shows review comments as diagnostics
+- `editors/zed`: the Zed extension that starts `buti lsp` (Rust, built to wasm); see [Zed](zed.md)
 - `internal/testrepo`: the test repository (see [Testing](testing.md))
 - `skills`: the agent skills (`buti-resolve/SKILL.md`, `buti-review/SKILL.md`), embedded in the binary for `buti skill install`
 
 ## CI and releases
 
 - **Pull requests** (`.github/workflows/test.yml`): the `unit` and `integration` jobs must pass before a PR can merge
-  into `main`. See [Testing](testing.md#ci).
+  into `main`. See [Testing](testing.md#ci). The `zed-extension` job builds `editors/zed` to wasm.
 - **Releases** (`.github/workflows/release.yml`): every hour, if `main` has new commits, the tests run again and a
   release is published for Linux, macOS and Windows. Versions are [CalVer](https://calver.org) `YYYY.MM.DD.N`, where
   `N` counts the releases of that (UTC) day: `2026.09.26.1`, `2026.09.26.2`, ... The version is baked in with
-  `-ldflags "-X main.version=..."`; builds without it report `dev` and never check for updates.
+  `-ldflags "-X main.version=..."`; builds without it report `dev` and never check for updates. Each release also
+  carries `buti-zed-extension_<version>.tar.gz`, the Zed extension as Zed loads it (`extension.toml` and
+  `extension.wasm`).
 - `install.sh` downloads the latest release for the current platform.

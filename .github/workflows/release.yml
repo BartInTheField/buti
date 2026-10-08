@@ -83,8 +83,33 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
 
+  # The Zed extension that shows review comments (docs/zed.md), as Zed loads it: extension.toml and extension.wasm.
+  zed-extension:
+    needs: [version, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+          targets: wasm32-wasip2
+      - name: Build
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          cargo build --manifest-path editors/zed/Cargo.toml --release --target wasm32-wasip2
+          name="buti-zed-extension_${VERSION}"
+          mkdir -p "dist/$name"
+          cp editors/zed/extension.toml LICENSE "dist/$name/"
+          cp editors/zed/target/wasm32-wasip2/release/buti.wasm "dist/$name/extension.wasm"
+          tar czf "dist/$name.tar.gz" -C dist "$name"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-zed-extension
+          path: dist/*.tar.gz
+
   release:
-    needs: [version, build]
+    needs: [version, build, zed-extension]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v5

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,6 +87,8 @@ type harness struct {
 	log    string
 	stdout bytes.Buffer
 	stderr bytes.Buffer
+
+	stdin io.Reader // what a prompt reads; setting it makes stdin a terminal
 }
 
 func newHarness(t *testing.T) *harness {
@@ -98,10 +101,12 @@ func (h *harness) run(args ...string) int {
 	h.stdout.Reset()
 	h.stderr.Reset()
 	return Run(context.Background(), args, Env{
-		Stdout: &h.stdout,
-		Stderr: &h.stderr,
-		Store:  func() (*review.Store, error) { return h.store, nil },
-		But:    h.but,
+		Stdout:     &h.stdout,
+		Stderr:     &h.stderr,
+		Store:      func() (*review.Store, error) { return h.store, nil },
+		But:        h.but,
+		Stdin:      h.stdin,
+		IsTerminal: func() bool { return h.stdin != nil },
 	})
 }
 

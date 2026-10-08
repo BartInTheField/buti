@@ -280,7 +280,7 @@ func (m *Model) handleClick(msg tea.MouseClickMsg) tea.Cmd {
 		case h.ent.kind == entNewBranch:
 			return m.promptNewBranch(placementNone, "as a new lane")
 		case double && h.ent.kind == entConflict:
-			return m.execInteractive("Edit "+h.ent.label, keepSelection, editorCommand(m.pathOf(h.ent)))
+			return m.openInEditor(h.ent.label, 0, m.pathOf(h.ent))
 		case double:
 			return m.setDetailsFull(true)
 		}

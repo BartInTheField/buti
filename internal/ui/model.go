@@ -211,6 +211,9 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 	case prURLMsg:
 		return m.showPR(msg)
 
+	case zedDiffMsg:
+		return m.receiveZedDiff(msg)
+
 	case oplogMsg:
 		return m.showOplog(msg)
 
@@ -575,7 +578,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		case entArea, entFile, entCommittedFile:
 			return m.setDetailsFull(true)
 		case entConflict:
-			return m.execInteractive("Edit "+e.label, keepSelection, editorCommand(m.pathOf(e)))
+			return m.openInEditor(e.label, 0, m.pathOf(e))
 		case entNewBranch:
 			return m.promptNewBranch(but.Placement{}, "as a new lane")
 		}
@@ -826,7 +829,7 @@ func (m *Model) handleDetailsKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		d.rerender(marks)
 	case "D":
-		return m.setDetailsFull(!d.full), true
+		return m.fullDetails(m.subjects()), true
 	case "+", "=", "-":
 		if !d.treeShown() {
 			return nil, false // the split pane's height

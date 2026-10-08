@@ -4,6 +4,7 @@
 buti [-C dir] [--diff] [--remember-selection] [--version] [target]
 buti [-C dir] review <command> ...
 buti [-C dir] skill <command> ...
+buti [-C dir] lsp
 ```
 
 | Flag | Does |
@@ -18,6 +19,8 @@ The `but` CLI has to be on `PATH`, and the repository has to be set up with GitB
 runs the [review commands](#review-comments-for-coding-agents) and `buti skill` installs the
 [agent skills](#resolving-comments-with-a-coding-agent), both without starting the TUI; to select a branch called
 `review` or `skill` on start, run `buti -- review`.
+
+`buti lsp` is a language server that shows review comments in your editor; see [Zed](zed.md).
 
 ## The screen
 
