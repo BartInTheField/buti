@@ -46,7 +46,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: buti [-C dir] [--diff] [--remember-selection] [--version] [target]")
-		fmt.Fprintln(stderr, "       buti [-C dir] desktop [--serve | --dev] [--app path]")
 		fmt.Fprintln(stderr, "       buti [-C dir] review <command> ...")
 		fmt.Fprintln(stderr, "       buti [-C dir] skill <command> ...")
 		fmt.Fprintln(stderr, "       buti [-C dir] lsp")
@@ -76,8 +75,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 	rest := fs.Args()
 	if len(rest) > 0 && !slices.Contains(args[:len(args)-len(rest)], "--") {
 		switch rest[0] {
-		case "desktop":
-			return runDesktop(abs, flagSet(fs, "C"), rest[1:], stdout, stderr)
 		case "review":
 			return runReview(abs, rest[1:], stdout, stderr)
 		case "skill":
