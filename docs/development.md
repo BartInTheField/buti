@@ -21,9 +21,7 @@ The integration tests and the fixture need the [GitButler CLI](https://docs.gitb
 
 ## Layout
 
-- `cmd/buti`: entrypoint and flags; dispatches `buti desktop`, `buti review`, and `buti skill` (`desktop.go`, `skill.go`) before the TUI
-- `internal/desktop`: the localhost HTTP API and Tauri launcher for `buti desktop` ([Desktop](desktop.md), [ADR 0001](adr/0001-desktop-embedded-http.md))
-- `desktop/`: the Tauri + React + shadcn shell that calls that API
+- `cmd/buti`: entrypoint and flags; dispatches `buti review` and `buti skill` (`skill.go`) before the TUI
 - `internal/but`: the `but` CLI client
   - reads JSON: status, diff, branch list, oplog
   - runs mutations; each one has a function
