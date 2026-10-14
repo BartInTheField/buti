@@ -245,6 +245,51 @@ read in buti. It changes no code and never runs git write commands.
 It installs with `buti skill install` alongside `/buti-resolve`, as [above](#resolving-comments-with-a-coding-agent).
 An agent without skills can take it as a prompt: `buti skill show buti-review > buti-review.md`.
 
+## Branch walkthroughs
+
+A walkthrough is a markdown description of a branch, pinned to it, for whoever reviews it: what the change does, the
+files it touches, and diagrams of how it works, written as ```` ```mermaid ```` fences. A coding agent writes one with
+`buti walkthrough`, which needs no terminal and respects `-C dir`:
+
+```sh
+buti walkthrough list [--json]
+buti walkthrough show <branch> [--json]
+buti walkthrough set <branch> [--body-file <path> | --body "<markdown>"] [--title "<text>"] [--author <name>]
+buti walkthrough status <branch> [--json]
+buti walkthrough clear <branch>
+```
+
+- A branch has one walkthrough; `set` replaces it. Without `--body` or `--body-file` (or with `--body-file -`), `set`
+  reads the markdown from stdin.
+- `set` takes the branch's name or its cli id, needs the branch applied in the workspace, and records its tip commit.
+  It is signed `agent` unless you pass `--author`.
+- `status` compares that tip with the branch now: the walkthrough is `stale` once the branch has other commits, or
+  when the branch can't be found. `in_workspace` is false when the branch is deleted or unapplied.
+- A renamed branch is found by the change id of the tip the walkthrough was written on. `set` and `status` move its
+  walkthrough to the new name, and that `status` reports the new name in `renamed_to`; after that the walkthrough is
+  under the new name only. When the new name has a walkthrough of its own, both are kept and the old one stays
+  under the old name until you `clear` it. A branch renamed before it had commits can't be found this way. `set` and `status` run
+  `but status`; the others don't need `but`.
+- `show` prints the markdown as stored; `show --json` and `list --json` print `branch`, `title`, `author`,
+  `updated_at` and `head` (the recorded tip, or `null`), and `show` adds `body`.
+- Walkthroughs live in `<git-common-dir>/buti/walkthroughs.json`, which is never committed. `clear` removes one;
+  deleting a branch leaves its walkthrough until you do.
+
+`status --json`:
+
+```json
+{
+  "branch": "auth",
+  "exists": true,
+  "title": "Token auth",
+  "author": "agent",
+  "updated_at": "2026-10-14T09:12:00Z",
+  "in_workspace": true,
+  "renamed_to": null,
+  "stale": false
+}
+```
+
 ## Not (yet) ported from `but tui`
 
 - **Reordering stacks:** `but tui` uses an internal API for this, and there is no CLI command.
