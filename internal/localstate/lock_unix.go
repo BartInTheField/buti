@@ -1,6 +1,6 @@
 //go:build unix
 
-package review
+package localstate
 
 import (
 	"errors"
