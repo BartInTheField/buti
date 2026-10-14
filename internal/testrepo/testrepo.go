@@ -227,7 +227,7 @@ func (b *builder) build() {
 // then pulls, which rebases that commit onto the upstream one into a conflict.
 // It also sets the identity in the repository's config: resolving the commit writes a
 // reflog entry, which needs a committer even when buti runs without testrepo.Env
-// (the mkrepo command line, the desktop e2e tests).
+// (the mkrepo command line).
 func (r *Repo) Conflict() error {
 	b := &builder{r: r}
 	b.run("git", "config", "user.name", "Ada Lovelace")

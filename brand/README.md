@@ -52,10 +52,6 @@ The wordmark is `buti` set in JetBrains Mono ExtraBold, lowercase, tracking -0.0
   square in Violet with the lanes in Paper; the commit dot is Mint.
 - `logo.svg`: the mark with the wordmark, for banners and the README.
 - `logo-dark-text.svg`: the wordmark in Ink, for light backgrounds.
-- `app-icon-macos.svg`: the mark on Apple's macOS icon grid (an 824px rounded square inside a 1024px canvas, with
-  a soft gradient and drop shadow). `desktop/src-tauri/icons/icon.icns` is built from it with
-  `npx tauri icon ../brand/app-icon-macos.svg -o /tmp/icons` (run in `desktop/`); copy only `icon.icns`, since the
-  other platforms use the full-bleed mark.
 
 Keep clear space of one lane's width around the mark. The mark works down to 16px (the favicon): at that size the
 dot is dropped.

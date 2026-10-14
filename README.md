@@ -75,7 +75,6 @@ Select something, press a verb (`c` commit, `r` squash/amend, `m` move, `p` cher
 - [Keys](docs/keys.md): every key binding
 - [Development](docs/development.md): building, the code layout, releases
 - [Testing](docs/testing.md): unit tests, the test repository, end-to-end tests and screenshots, CI
-- [Desktop](docs/desktop.md): the Tauri spike (`buti desktop`), and how to build it on macOS and Linux
 
 Found a bug or have an idea? [Open an issue](https://github.com/BartInTheField/buti/issues/new/choose).
 
