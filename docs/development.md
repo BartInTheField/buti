@@ -40,6 +40,7 @@ The integration tests and the fixture need the [GitButler CLI](https://docs.gitb
 - `internal/reviewcli`: the `buti review` commands for coding agents, and the flat JSON they print
 - `internal/walkthrough`: the walkthroughs pinned to branches, `<git-common-dir>/buti/walkthroughs.json`. `Locate`
   finds a walkthrough's branch in `but status`, after a rename too, and whether the branch has moved on since
+- `internal/walkthroughcli`: the `buti walkthrough` commands for coding agents
 - `internal/localstate`: where those files live, and the lock and atomic write that let the TUI and an agent share them
 - `internal/update`: finding the latest release and replacing the running binary
 - `internal/editor`: the user's editor (`o`), and the old and new copies for a diff in Zed (`Z`)

@@ -13,6 +13,7 @@ import (
 	"github.com/bartinthefield/buti/internal/but"
 	"github.com/bartinthefield/buti/internal/review"
 	"github.com/bartinthefield/buti/internal/testrepo"
+	"github.com/bartinthefield/buti/internal/walkthrough"
 	"github.com/bartinthefield/buti/skills"
 )
 
@@ -66,6 +67,47 @@ func TestReviewDispatch(t *testing.T) {
 		t.Errorf("list without but: exit %d, %q", code, stderr)
 	}
 	if code, _, stderr := runButi("-C", dir, "review"); code != 2 || !strings.Contains(stderr, "usage:") {
+		t.Errorf("no subcommand: exit %d, %q", code, stderr)
+	}
+}
+
+// TestWalkthroughDispatch runs `buti walkthrough` in a plain git repository, before and without the TUI, and with -C.
+func TestWalkthroughDispatch(t *testing.T) {
+	if code, _, stderr := runButi("--help"); code != 0 ||
+		!strings.Contains(stderr, "buti [-C dir] walkthrough <command>") || !strings.Contains(stderr, "buti walkthrough set <branch>") {
+		t.Errorf("--help: exit %d\n%s", code, stderr)
+	}
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "init", "-q", dir).CombinedOutput(); err != nil {
+		t.Skipf("git init: %v %s", err, out)
+	}
+	s, err := walkthrough.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Set(walkthrough.Walkthrough{Branch: "auth", Body: "# Auth\n"}); err != nil {
+		t.Fatal(err)
+	}
+	// Reading and clearing need no `but`, so these pass with only git on PATH.
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not on PATH")
+	}
+	bin := t.TempDir()
+	if err := os.Symlink(git, filepath.Join(bin, "git")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	if code, out, stderr := runButi("-C", dir, "walkthrough", "show", "auth"); code != 0 || out != "# Auth\n" {
+		t.Fatalf("show: exit %d, %q %q", code, out, stderr)
+	}
+	if code, _, stderr := runButi("-C", dir, "walkthrough", "set", "auth", "--body", "x"); code != 1 || !strings.Contains(stderr, "`but`") {
+		t.Errorf("set without but: exit %d, %q", code, stderr)
+	}
+	if code, out, _ := runButi("-C", dir, "walkthrough", "clear", "auth"); code != 0 || !strings.Contains(out, "cleared") {
+		t.Errorf("clear: exit %d, %q", code, out)
+	}
+	if code, _, stderr := runButi("-C", dir, "walkthrough"); code != 2 || !strings.Contains(stderr, "usage:") {
 		t.Errorf("no subcommand: exit %d, %q", code, stderr)
 	}
 }
@@ -251,5 +293,50 @@ func TestSkillCommands(t *testing.T) {
 	}
 	if code, _, stderr := runButi("skill"); code != 2 || !strings.Contains(stderr, "buti skill install") {
 		t.Errorf("no subcommand: exit %d, %q", code, stderr)
+	}
+}
+
+// TestIntegrationWalkthrough pins a walkthrough to a branch of the test repository with the real `but`, and checks that
+// it goes stale once the branch moves on. It is opt-in: BUTI_INTEGRATION=1 go test ./cmd/buti
+func TestIntegrationWalkthrough(t *testing.T) {
+	if os.Getenv("BUTI_INTEGRATION") == "" {
+		t.Skip("set BUTI_INTEGRATION=1 to run against the real but CLI")
+	}
+	if _, err := exec.LookPath("but"); err != nil {
+		t.Skip("but not on PATH")
+	}
+	r, err := testrepo.Create(testrepo.TempDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Setenv(t.Setenv)
+	body := "## Summary\n\n```mermaid\nsequenceDiagram\n    Client->>API: POST /login\n```\n"
+	file := filepath.Join(t.TempDir(), "walkthrough.md")
+	if err := os.WriteFile(file, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, stderr := runButi("-C", r.Dir, "walkthrough", "set", "auth", "--body-file", file, "--title", "Token auth"); code != 0 {
+		t.Fatalf("set: exit %d, %q %q", code, out, stderr)
+	}
+	status := func() map[string]any {
+		t.Helper()
+		code, out, stderr := runButi("-C", r.Dir, "walkthrough", "status", "auth", "--json")
+		var s map[string]any
+		if err := json.Unmarshal([]byte(out), &s); code != 0 || err != nil {
+			t.Fatalf("status: exit %d, %v %q %q", code, err, out, stderr)
+		}
+		return s
+	}
+	if s := status(); s["exists"] != true || s["in_workspace"] != true || s["stale"] != false {
+		t.Errorf("after set: %v", s)
+	}
+	if code, out, _ := runButi("-C", r.Dir, "walkthrough", "show", "auth"); code != 0 || out != body {
+		t.Errorf("show: exit %d, %q", code, out)
+	}
+	if err := but.New(r.Dir).EmptyCommit(context.Background(), "Later work", but.Placement{Branch: "auth"}); err != nil {
+		t.Fatal(err)
+	}
+	if s := status(); s["stale"] != true {
+		t.Errorf("after a new commit: %v", s)
 	}
 }

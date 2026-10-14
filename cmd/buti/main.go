@@ -20,6 +20,8 @@ import (
 	"github.com/bartinthefield/buti/internal/review"
 	"github.com/bartinthefield/buti/internal/reviewcli"
 	"github.com/bartinthefield/buti/internal/ui"
+	"github.com/bartinthefield/buti/internal/walkthrough"
+	"github.com/bartinthefield/buti/internal/walkthroughcli"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -47,11 +49,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: buti [-C dir] [--diff] [--remember-selection] [--version] [target]")
 		fmt.Fprintln(stderr, "       buti [-C dir] review <command> ...")
+		fmt.Fprintln(stderr, "       buti [-C dir] walkthrough <command> ...")
 		fmt.Fprintln(stderr, "       buti [-C dir] skill <command> ...")
 		fmt.Fprintln(stderr, "       buti [-C dir] lsp")
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr, "\nReview comments, for coding agents (no TUI):")
 		fmt.Fprintln(stderr, indentLines(reviewcli.Usage))
+		fmt.Fprintln(stderr, "\nBranch walkthroughs, for coding agents (no TUI):")
+		fmt.Fprintln(stderr, indentLines(walkthroughcli.Usage))
 		fmt.Fprintln(stderr, "\nAgent skills, /buti-resolve and /buti-review:")
 		fmt.Fprintln(stderr, indentLines(skillUsage))
 	}
@@ -71,12 +76,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "buti:", err)
 		return 1
 	}
-	// A branch called review or skill can still be selected on start with `buti -- review`.
+	// A branch called review, walkthrough or skill can still be selected on start with `buti -- review`.
 	rest := fs.Args()
 	if len(rest) > 0 && !slices.Contains(args[:len(args)-len(rest)], "--") {
 		switch rest[0] {
 		case "review":
 			return runReview(abs, rest[1:], stdout, stderr)
+		case "walkthrough":
+			return runWalkthrough(abs, rest[1:], stdout, stderr)
 		case "skill":
 			return runSkill(abs, rest[1:], stdout, stderr)
 		case "lsp":
@@ -121,6 +128,23 @@ func runReview(dir string, args []string, stdout, stderr io.Writer) int {
 		Stdout: stdout,
 		Stderr: stderr,
 		Store:  func() (*review.Store, error) { return review.Open(dir) },
+		But:    but.New(dir),
+	})
+}
+
+// runWalkthrough runs `buti walkthrough`, which needs no terminal, and `but` only for the commands that read the
+// workspace.
+func runWalkthrough(dir string, args []string, stdout, stderr io.Writer) int {
+	if walkthroughcli.NeedsBut(args) {
+		if _, err := exec.LookPath("but"); err != nil {
+			fmt.Fprintln(stderr, "buti walkthrough: the GitButler CLI (`but`) must be on PATH")
+			return 1
+		}
+	}
+	return walkthroughcli.Run(context.Background(), args, walkthroughcli.Env{
+		Stdout: stdout,
+		Stderr: stderr,
+		Store:  func() (*walkthrough.Store, error) { return walkthrough.Open(dir) },
 		But:    but.New(dir),
 	})
 }
