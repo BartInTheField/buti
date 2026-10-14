@@ -1,4 +1,4 @@
-package review
+package localstate
 
 import (
 	"fmt"
@@ -12,9 +12,9 @@ const (
 	lockPoll    = 5 * time.Millisecond
 )
 
-// lock takes an exclusive OS lock on the lock file next to path, creating the directory if needed, and returns the
+// Lock takes an exclusive OS lock on the lock file next to path, creating the directory if needed, and returns the
 // function that releases it. The OS drops the lock when a writer dies, so a crash never leaves the store locked.
-func lock(path string) (func(), error) {
+func Lock(path string) (func(), error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}

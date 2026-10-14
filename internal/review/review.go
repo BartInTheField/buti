@@ -13,11 +13,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/bartinthefield/buti/internal/localstate"
 )
 
 // Version is the schema version written to the file.
@@ -121,25 +122,14 @@ func New(path string) *Store {
 	return &Store{Path: path, now: time.Now}
 }
 
-// Open returns the store of the repository containing dir, at <git-common-dir>/buti/review.json.
-//
-// The common dir, rather than --git-dir, is shared by all worktrees of a repository. GitButler keeps its own state
-// there too, and commit change ids are repository-wide, so every worktree sees the same comments. Living inside the
-// git dir keeps the file out of commits and out of the way of `but` operations.
+// Open returns the store of the repository containing dir, at <git-common-dir>/buti/review.json; see
+// localstate.Dir for why it lives there.
 func Open(dir string) (*Store, error) {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir").Output()
+	d, err := localstate.Dir(dir)
 	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-			return nil, fmt.Errorf("finding the git dir: %s", strings.TrimSpace(string(ee.Stderr)))
-		}
-		return nil, fmt.Errorf("finding the git dir: %w", err)
+		return nil, err
 	}
-	gitDir := strings.TrimSpace(string(out))
-	if !filepath.IsAbs(gitDir) {
-		gitDir = filepath.Join(dir, gitDir)
-	}
-	return New(filepath.Join(gitDir, "buti", "review.json")), nil
+	return New(filepath.Join(d, "review.json")), nil
 }
 
 // Load reads the file. A missing or empty file is an empty store.
@@ -357,7 +347,7 @@ func (s *Store) Clear(statuses ...Status) (int, error) {
 
 // modify runs fn on the current file under the lock and writes the result when fn succeeds.
 func (s *Store) modify(fn func(*File) error) error {
-	unlock, err := lock(s.Path)
+	unlock, err := localstate.Lock(s.Path)
 	if err != nil {
 		return err
 	}
@@ -386,31 +376,7 @@ func (s *Store) write(f File) error {
 	if err != nil {
 		return err
 	}
-	data = append(data, '\n')
-	tmp, err := os.CreateTemp(filepath.Dir(s.Path), ".review-*.json")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = os.Remove(tmp.Name()) }()
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	// Windows refuses to replace a file another process is reading for a moment; retry briefly.
-	for i := 0; ; i++ {
-		err = os.Rename(tmp.Name(), s.Path)
-		if err == nil || i == 20 {
-			return err
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	return localstate.WriteFile(s.Path, append(data, '\n'))
 }
 
 func (a Anchor) validate() error {
