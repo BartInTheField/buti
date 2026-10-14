@@ -194,16 +194,18 @@ or `[nit]` when it is right for the code and dismisses it with the reason when i
 amend the fix into that commit with `but amend`. It never runs git write commands. It ends with a summary per
 shortcode (`zz`, each stack, each commit).
 
-Each skill is one agent-agnostic file, [`skills/buti-resolve/SKILL.md`](../skills/buti-resolve/SKILL.md) and
-[`skills/buti-review/SKILL.md`](../skills/buti-review/SKILL.md), which any agent that can follow a markdown skill and run
-shell commands can use. buti carries a copy of both, so they match the `buti review` commands of the version you run:
+Each skill is one agent-agnostic file, [`skills/buti-resolve/SKILL.md`](../skills/buti-resolve/SKILL.md),
+[`skills/buti-review/SKILL.md`](../skills/buti-review/SKILL.md) and
+[`skills/buti-walkthrough/SKILL.md`](../skills/buti-walkthrough/SKILL.md), which any agent that can follow a markdown
+skill and run shell commands can use. buti carries a copy of each, so they match the `buti review` and
+`buti walkthrough` commands of the version you run:
 
 ```sh
 buti skill list                          # the skills buti carries
 buti skill show buti-resolve             # print a SKILL.md
 buti skill install --agent <agent>       # into the agent's skills directory in your home directory
 buti skill install --agent <agent> --project   # into the repository instead, for everyone who works on it
-buti skill install --target <dir>        # into <dir>/buti-resolve and <dir>/buti-review, for any other agent
+buti skill install --target <dir>        # into <dir>/<skill> for each skill, for any other agent
 ```
 
 `install` copies every skill unless you name some (`buti skill install --agent claude buti-resolve`), and replaces an earlier install, so run it again after updating
@@ -223,8 +225,8 @@ For an agent that isn't listed, point `--target` at its skills directory. One wi
 prompt: save it with `buti skill show buti-resolve > buti-resolve.md` and add it to the chat, for example with
 `/read-only buti-resolve.md` in Aider, then ask it to resolve the buti review comments. You can also give an argument:
 a comment id to fix only that one, or a shortcode (`zz`, a commit id) to fix only the comments there, as in
-`/buti-resolve c3`. `/buti-review` is invoked the same way (`/buti-review`, `$buti-review`, or ask for a review to read
-in buti).
+`/buti-resolve c3`. `/buti-review` and `/buti-walkthrough` are invoked the same way (`/buti-review`, `$buti-review`, or
+ask for a review to read in buti).
 
 ## Reviewing with a coding agent
 
@@ -289,6 +291,19 @@ buti walkthrough clear <branch>
   "stale": false
 }
 ```
+
+### Writing a walkthrough with a coding agent
+
+`/buti-walkthrough` has a coding agent write one: run `/buti-walkthrough <branch>` (or with no argument when only one
+branch has commits). The agent reads the branch with `but status -f` and `but diff <branch>`, writes a summary, a table
+of the changed files, at least one Mermaid diagram (a sequence diagram when the change has components talking to each
+other, a flowchart otherwise), and optionally the review effort and risks, then pins it with `buti walkthrough set`.
+It changes no code, never runs git write commands, and doesn't invent related issues or pull requests. Run it again
+when the walkthrough goes stale. [Example walkthroughs](walkthrough-example.md) shows what it writes.
+
+It installs with `buti skill install` alongside `/buti-resolve`, as [above](#resolving-comments-with-a-coding-agent),
+into any of the agents listed there. An agent without skills can take it as a prompt:
+`buti skill show buti-walkthrough > buti-walkthrough.md`.
 
 ## Not (yet) ported from `but tui`
 

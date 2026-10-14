@@ -12,7 +12,7 @@ import (
 // TestSkillFiles checks that each skill has the front matter agents need to load it, named after its directory.
 func TestSkillFiles(t *testing.T) {
 	names := Names()
-	for _, want := range []string{"buti-resolve", "buti-review"} {
+	for _, want := range []string{"buti-resolve", "buti-review", "buti-walkthrough"} {
 		if !slices.Contains(names, want) {
 			t.Fatalf("Names() = %v, want %s", names, want)
 		}
@@ -73,6 +73,32 @@ func TestReviewSkillCommands(t *testing.T) {
 		"[must-fix]", "[suggestion]", "[nit]", "[question]",
 		"never run git write commands",
 		"/buti-resolve",
+	} {
+		if !bytes.Contains(data, []byte(want)) {
+			t.Errorf("SKILL.md does not mention %q", want)
+		}
+	}
+}
+
+// TestWalkthroughSkillCommands keeps /buti-walkthrough in step with the commands and sections it relies on.
+func TestWalkthroughSkillCommands(t *testing.T) {
+	data, err := Read("buti-walkthrough")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"which buti",
+		"install.sh",
+		"but status -f",
+		"but diff <branch>",
+		"buti walkthrough status <branch> --json",
+		"buti walkthrough set <branch> --title",
+		"--body-file <path>",
+		"buti walkthrough show <branch>",
+		"sequenceDiagram",
+		"flowchart TD",
+		"## Summary", "## Changes", "## How it works",
+		"never run git write commands",
 	} {
 		if !bytes.Contains(data, []byte(want)) {
 			t.Errorf("SKILL.md does not mention %q", want)

@@ -47,7 +47,8 @@ The integration tests and the fixture need the [GitButler CLI](https://docs.gitb
 - `internal/lsp`: `buti lsp`, the language server that shows review comments as diagnostics
 - `editors/zed`: the Zed extension that starts `buti lsp` (Rust, built to wasm); see [Zed](zed.md)
 - `internal/testrepo`: the test repository (see [Testing](testing.md))
-- `skills`: the agent skills (`buti-resolve/SKILL.md`, `buti-review/SKILL.md`), embedded in the binary for `buti skill install`
+- `skills`: the agent skills (`buti-resolve/SKILL.md`, `buti-review/SKILL.md`,
+  `buti-walkthrough/SKILL.md`), embedded in the binary for `buti skill install`
 
 ## CI and releases
 
