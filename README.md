@@ -69,7 +69,7 @@ Select something, press a verb (`c` commit, `r` squash/amend, `m` move, `p` cher
 ## Docs
 
 - [Usage](docs/usage.md): flags, the select → verb → target flow, drag and drop, the mouse, review comments,
-  `/buti-resolve` and `/buti-review`
+  `/buti-resolve` and `/buti-review`, and branch walkthroughs with `/buti-walkthrough`
 - [Resolving conflicts](docs/conflicts.md): fixing a conflicted commit in edit mode
 - [Zed](docs/zed.md): buti in a Zed tab, diffs in Zed, and review comments as diagnostics
 - [Keys](docs/keys.md): every key binding
