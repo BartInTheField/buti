@@ -103,7 +103,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	client := but.New(abs)
 	// In a worktree, `but` reports the whole workspace: buti opens the worktree and runs the workspace's `but` too.
-	if ws, wt, err := but.OpenWorktree(context.Background(), abs); err == nil && wt != nil {
+	// Without knowing which worktree it is, buti would show the workspace and run its commands in the worktree.
+	ws, wt, err := but.OpenWorktree(context.Background(), abs)
+	if err != nil {
+		fmt.Fprintln(stderr, "buti: finding the worktree in", abs+":", err)
+		return 1
+	}
+	if wt != nil {
 		client, opts.Worktree = ws, wt
 	}
 	p := tea.NewProgram(ui.New(client, opts))

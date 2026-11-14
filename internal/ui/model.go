@@ -193,6 +193,10 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 		}
 		m.err = msg.err
 		if msg.err != nil {
+			// Removed with `but worktree remove` or rm: `but` can't even start in a directory that is gone.
+			if _, err := os.Stat(m.client.Dir); m.worktree != "" && os.IsNotExist(err) {
+				return m.switchWorktreeSaying("", "", "Worktree "+m.worktree+" is gone. ")
+			}
 			return nil
 		}
 		view, ok := m.viewStatus(msg.status)

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -99,4 +100,31 @@ func TestWorktreeGone(t *testing.T) {
 	h.but.setStatus(testStatus()) // removed elsewhere, with `but worktree remove`
 	h.run(h.m.fetchStatus())
 	h.wantOnScreen("second", "Worktree search is gone. Viewing the workspace")
+}
+
+// A worktree whose directory is removed fails every status; buti goes back to the workspace instead of erroring on.
+func TestWorktreeDirRemoved(t *testing.T) {
+	h, dir := newWorktreeHarness(t, Options{Worktree: &but.WorktreeListing{Name: "search"}})
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	h.run(h.m.fetchStatus())
+	h.wantOnScreen("second", "Worktree search is gone. Viewing the workspace")
+}
+
+// A worktree status doesn't have yet, like one just created, shows nothing to act on until its status arrives:
+// the workspace's entities would otherwise run in the new worktree.
+func TestSwitchToUncachedWorktree(t *testing.T) {
+	h, _ := newWorktreeHarness(t, Options{})
+	h.selectText("go.mod")
+	_ = h.m.switchWorktree("docs", t.TempDir()) // the fetch it returns hasn't answered yet
+	if e := h.m.selected(); e.valid() {
+		t.Errorf("selected %s before the new worktree's status arrived", e.key())
+	}
+	if h.offered("x") || h.offered("c") {
+		t.Error("discard or commit offered before the new worktree's status arrived")
+	}
+	if s := h.screen(); strings.Contains(s, "go.mod") || strings.Contains(s, "second") {
+		t.Errorf("the workspace still shows after switching to docs:\n%s", s)
+	}
 }

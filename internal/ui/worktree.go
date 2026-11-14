@@ -175,12 +175,17 @@ func (m *Model) switchWorktreeSaying(name, path, why string) tea.Cmd {
 	m.marks, m.target = map[string]entity{}, nil
 	m.focus, m.lane, m.laneCursor, m.laneOffset, m.fileCursor, m.fileOffset = focusLanes, 0, 0, 0, -1, 0
 	m.det.focused, m.det.full = false, false
-	m.commentsKey = ""
-	// Show it at once from the status we have; the fetch brings its diffs and anything newer.
+	m.commentsKey, m.err = "", nil
+	// Show it at once from the status we have; the fetch brings its diffs and anything newer. A worktree that status
+	// doesn't have yet, like one just created, shows nothing until the fetch: the old view's entities would run in it.
+	var view *but.Status
 	if m.all != nil {
-		if view, ok := m.viewStatus(m.all); ok {
-			m.applyStatus(view)
-		}
+		view, _ = m.viewStatus(m.all)
+	}
+	if view != nil {
+		m.applyStatus(view)
+	} else {
+		m.status, m.files, m.lanes = nil, nil, nil
 	}
 	return tea.Batch(m.fetchStatus(), m.syncDetails(true), m.notify(toastInfo, why+"Viewing "+m.worktreeLabel()))
 }
