@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Runs or records buti against a fresh test repository (internal/testrepo), for showing work done in an orb.
+#
+#   .amp/buti run [-conflict]            build buti and run it, e.g. in the Terminal tab
+#   .amp/buti record <tape> [-conflict]  record a VHS tape; its Output and Screenshot files land in .amp/in/artifacts
+#
+# A tape starts buti by typing `buti`, which runs in the test repository; see .amp/tapes/example.tape.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+usage() { sed -n '4,5s/^# *//p' "${BASH_SOURCE[0]}" >&2; exit 2; }
+
+cmd="${1:-}"
+shift || usage
+tape=""
+if [ "$cmd" = record ]; then
+  [ $# -ge 1 ] || usage
+  tape="$(realpath "$1")"
+  shift
+elif [ "$cmd" != run ]; then
+  usage
+fi
+
+cd "$repo_root"
+go build -o bin/buti ./cmd/buti
+fx="$(mktemp -d /tmp/buti-fixture.XXXXXX)"
+go run ./internal/testrepo/mkrepo "$@" "$fx" >/dev/null
+
+# The same isolated HOME and identity as testrepo.Env, so commits work and the real GitButler config stays untouched.
+mkdir -p "$fx/bin"
+cat >"$fx/bin/buti" <<EOF
+#!/usr/bin/env bash
+export HOME="$fx/home" XDG_CONFIG_HOME="$fx/home/.config" XDG_DATA_HOME="$fx/home/.local/share"
+export XDG_CACHE_HOME="$fx/home/.cache" XDG_STATE_HOME="$fx/home/.local/state" GIT_CONFIG_NOSYSTEM=1
+export GIT_AUTHOR_NAME="Ada Lovelace" GIT_AUTHOR_EMAIL=ada@example.com
+export GIT_COMMITTER_NAME="Ada Lovelace" GIT_COMMITTER_EMAIL=ada@example.com BUTI_NO_UPDATE_CHECK=1
+cd "$fx/repo"
+exec "$repo_root/bin/buti" "\$@"
+EOF
+chmod +x "$fx/bin/buti"
+echo "test repository: $fx/repo" >&2
+
+if [ "$cmd" = run ]; then
+  exec "$fx/bin/buti"
+fi
+mkdir -p .amp/in/artifacts
+cd .amp/in/artifacts
+PATH="$fx/bin:$PATH" vhs "$tape"
