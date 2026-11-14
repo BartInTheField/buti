@@ -8,7 +8,7 @@ type entityKind int
 
 const (
 	entNone          entityKind = iota
-	entArea                     // every uncommitted change ("zz")
+	entArea                     // every uncommitted change ("@")
 	entDir                      // directory in the unstaged tree: all files below it
 	entFile                     // uncommitted file, unassigned or assigned to a stack
 	entHunk                     // single uncommitted hunk
@@ -31,7 +31,7 @@ func (k entityKind) uncommitted() bool {
 // entity is anything that can be selected, marked, or be the source or target of an operation.
 type entity struct {
 	kind  entityKind
-	id    string   // CLI id; "zz" for the area
+	id    string   // CLI id; "@" for the area
 	ids   []string // CLI ids of the files below, for directories
 	label string   // human readable: path, branch name or commit subject
 

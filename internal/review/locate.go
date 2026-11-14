@@ -12,7 +12,7 @@ import (
 )
 
 // TargetUnassigned is the shortcode of the unassigned changes.
-const TargetUnassigned = "zz"
+const TargetUnassigned = "@"
 
 // Differ fetches `but diff --json` for a cli id; *but.Client is one.
 type Differ interface {
@@ -95,7 +95,7 @@ func (s *Store) Save(ls []Located) error {
 //     the commit is gone, the comment follows its lines to where an uncommit or a squash put them: the uncommitted
 //     changes, then another commit. Only a line that is added or removed there counts, not context. Otherwise the
 //     comment is orphaned.
-//   - An uncommitted comment looks for its file in its own place (`zz` or its branch's stack), then in the other
+//   - An uncommitted comment looks for its file in its own place (`@` or its branch's stack), then in the other
 //     uncommitted places, then in the applied commits, so it follows the file when it is committed.
 //   - In the file's diff, a line whose text moved is found again at the nearest place it now is. A line that is not
 //     in the diff any more makes the comment outdated.

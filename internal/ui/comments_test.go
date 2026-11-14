@@ -333,5 +333,5 @@ func TestAgentComment(t *testing.T) {
 	h.keys("esc", "ctrl+p")
 	h.typeText("review comments")
 	h.keys("enter")
-	h.wantScreen("go.mod line 2  [must-fix] 1.22 is out of support", "agent · zz")
+	h.wantScreen("go.mod line 2  [must-fix] 1.22 is out of support", "agent · @")
 }

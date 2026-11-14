@@ -742,7 +742,7 @@ func (m *Model) copyPicker(sel []entity) tea.Cmd {
 func (m *Model) gotoPicker([]entity) tea.Cmd {
 	var items []pickItem
 	if m.status != nil {
-		items = append(items, pickItem{label: "Unstaged changes", detail: "zz", value: entity{kind: entArea}})
+		items = append(items, pickItem{label: "Unstaged changes", detail: "@", value: entity{kind: entArea}})
 		for _, r := range buildFileRows(m.status.UncommittedChanges, map[string]bool{}) {
 			if !r.isDir {
 				items = append(items, pickItem{label: "  " + r.path, detail: r.change.CliID, value: r.entity()})
@@ -766,7 +766,7 @@ func (m *Model) gotoPicker([]entity) tea.Cmd {
 }
 
 func (m *Model) branchPicker([]entity) tea.Cmd {
-	items := []pickItem{{label: "Unstaged changes", detail: "zz", value: entity{kind: entArea}}}
+	items := []pickItem{{label: "Unstaged changes", detail: "@", value: entity{kind: entArea}}}
 	for _, l := range m.lanes {
 		for _, e := range l.items {
 			if e.kind == entBranch {

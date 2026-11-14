@@ -80,7 +80,7 @@ func (m *Model) hitTest(x, y int) hit {
 	if x < sw {
 		switch y {
 		case 0:
-			return hit{kind: hitEntity, ent: entity{kind: entArea, id: "zz", label: "all changes"}, files: true, row: -1}
+			return hit{kind: hitEntity, ent: entity{kind: entArea, id: "@", label: "all changes"}, files: true, row: -1}
 		case 1:
 			return hit{}
 		}

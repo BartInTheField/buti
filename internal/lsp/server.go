@@ -41,7 +41,7 @@ type Workspace struct {
 }
 
 // Opener opens the workspace containing root. The server calls it once it knows the root from initialize, and
-// again after a failure, so an editor started before `but setup` recovers.
+// again after a failure, so an editor started before `but init` recovers.
 type Opener func(root string) (*Workspace, error)
 
 // Config configures a Server. Zero intervals take the defaults.

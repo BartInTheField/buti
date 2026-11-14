@@ -187,8 +187,6 @@ func (b *builder) build() {
 	b.run("git", "commit", "-qm", "Try an experiment")
 	b.run("git", "checkout", "-q", "main")
 
-	b.run("but", "setup")
-
 	// Stack 1: api (pushed) with auth stacked on top (unpushed).
 	b.run("but", "branch", "new", "api")
 	b.write("src/api/routes.go", "package api\n\nvar Routes = []string{\"/health\"}\n")

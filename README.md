@@ -53,8 +53,8 @@ build from source:
 go install github.com/bartinthefield/buti/cmd/buti@latest
 ```
 
-buti needs the [GitButler CLI](https://docs.gitbutler.com/cli-guides/installation) (`but`) on `PATH`, in a repository
-set up with `but setup`. It checks for a new release on start and offers to update itself; set
+buti needs the [GitButler CLI](https://docs.gitbutler.com/cli-guides/installation) (`but`) 0.23 or later on `PATH`,
+in any Git repository. It checks for a new release on start and offers to update itself; set
 `BUTI_NO_UPDATE_CHECK=1` to turn that off.
 
 ## Usage

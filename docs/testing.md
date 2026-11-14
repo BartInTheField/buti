@@ -58,7 +58,7 @@ mise run fixture   # prints the command to run buti against it
 go run ./internal/testrepo/mkrepo -conflict "$(mktemp -d)"   # with the conflicted commit
 ```
 
-`but` 0.22 has no command to assign a change to a stack, so the fixture has no assigned changes.
+`but` 0.23 has no command to assign a change to a stack, so the fixture has no assigned changes.
 
 ## End-to-end tests
 

@@ -27,7 +27,7 @@ const Version = 1
 type Kind string
 
 const (
-	KindUnassigned Kind = "unassigned" // uncommitted work not assigned to a stack (`zz`)
+	KindUnassigned Kind = "unassigned" // uncommitted work not assigned to a stack (`@`)
 	KindAssigned   Kind = "assigned"   // uncommitted work assigned to the stack of Anchor.Branch
 	KindCommit     Kind = "commit"     // a commit, found by Anchor.ChangeID
 )

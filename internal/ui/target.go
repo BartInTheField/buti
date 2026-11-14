@@ -66,7 +66,7 @@ func sourcesFor(v verb, subjects []entity) ([]entity, string) {
 			return subjects, ""
 		}
 		// On a branch or commit, commit everything uncommitted (like `but tui`).
-		return []entity{{kind: entArea, id: "zz", label: "all changes"}}, ""
+		return []entity{{kind: entArea, id: "@", label: "all changes"}}, ""
 	case verbSquash:
 		if allOf(subjects, entArea, entDir, entFile, entHunk) || allOf(subjects, entCommit) ||
 			allOf(subjects, entBranch) || allOf(subjects, entCommittedFile) {
