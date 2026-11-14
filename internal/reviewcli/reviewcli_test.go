@@ -155,7 +155,7 @@ func TestListJSON(t *testing.T) {
 	want := []map[string]any{
 		{
 			"id": usage.ID, "status": "open", "author": "user", "body": "Say more", "file": "README.md", "line": 5.0, "end_line": 5.0,
-			"side": "new", "shortcode": "zz", "file_shortcode": "rl", "kind": "unassigned", "branch": nil,
+			"side": "new", "shortcode": "@", "file_shortcode": "rl", "kind": "unassigned", "branch": nil,
 			"commit": nil, "outdated": false,
 			"context": "  3 | A small service.\n  4 | \n> 5 | ## Usage\n  6 | \n  7 |     go run ./src",
 		},

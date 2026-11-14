@@ -37,7 +37,7 @@ func TestComment(t *testing.T) {
 			args: []string{"--file", "README.md", "--line", "5"},
 			want: review.Anchor{Kind: review.KindUnassigned, Path: "README.md", Side: review.SideNew, Line: 5, EndLine: 5,
 				LineText: "## Usage"},
-			out: "on zz README.md:5",
+			out: "on @ README.md:5",
 		},
 		{
 			name: "assigned by default",
@@ -92,11 +92,11 @@ func TestComment(t *testing.T) {
 			out: "on k0 docs/a.md:1",
 		},
 		{
-			name: "the old side",
+			name: "the old side, with the pre-0.23 zz for the uncommitted changes",
 			args: []string{"--shortcode", "zz", "--file", "README.md", "--line", "3", "--side", "old"},
 			want: review.Anchor{Kind: review.KindUnassigned, Path: "README.md", Side: review.SideOld, Line: 3, EndLine: 3,
 				LineText: "A small service."},
-			out: "on zz README.md:3",
+			out: "on @ README.md:3",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -157,12 +157,12 @@ func TestCommentErrors(t *testing.T) {
 		{[]string{"--file", "README.md", "--line", "1"}, 2, "--body is required"},
 		{[]string{"--file", "README.md", "--line", "1", "--body", "x", "extra"}, 2, `unexpected argument "extra"`},
 		{[]string{"--file", "README.md", "--line", "9", "--body", "x"}, 1,
-			"line 9 of README.md on the new side is not in the diff of zz"},
+			"line 9 of README.md on the new side is not in the diff of @"},
 		{[]string{"--file", "README.md", "--line", "4", "--end-line", "9", "--body", "x"}, 1, "lines 4-9 of README.md"},
 		{[]string{"--file", "src/auth/token.go", "--line", "1", "--body", "x"}, 1,
 			"src/auth/token.go has no uncommitted changes; pass --shortcode"},
-		{[]string{"--file", "docs/a.md", "--line", "1", "--shortcode", "zz", "--body", "x"}, 1,
-			"zz (the unassigned changes) does not change docs/a.md"},
+		{[]string{"--file", "docs/a.md", "--line", "1", "--shortcode", "@", "--body", "x"}, 1,
+			"@ (the unassigned changes) does not change docs/a.md"},
 		{[]string{"--file", "README.md", "--line", "1", "--shortcode", "knl", "--body", "x"}, 1,
 			"commit knl does not change README.md"},
 		{[]string{"--file", "README.md", "--line", "1", "--shortcode", "auth", "--body", "x"}, 1,
@@ -218,7 +218,7 @@ func TestCommentWorktree(t *testing.T) {
 			args: []string{"--file", "README.md", "--line", "5"},
 			want: review.Anchor{Kind: review.KindUnassigned, Path: "README.md", Side: review.SideNew, Line: 5, EndLine: 5,
 				LineText: "## Usage"},
-			out: "on zz README.md:5",
+			out: "on @ README.md:5",
 		},
 		{
 			// Line 5 here is line 3 in the commit that adds it; the newer commit only has it as context.
@@ -277,7 +277,7 @@ func TestCommentWorktreeErrors(t *testing.T) {
 		{[]string{"--file", "src/auth/token.go", "--line", "1"}, 1, "src/auth/token.go:1 is not part of any change"},
 		{[]string{"--file", "README.md", "--line", "20"}, 1, "README.md has 7 lines, not 20"},
 		{[]string{"--file", "README.md", "--line", "1", "--side", "old"}, 2, "--worktree counts lines"},
-		{[]string{"--file", "README.md", "--line", "1", "--shortcode", "zz"}, 2, "drop --shortcode"},
+		{[]string{"--file", "README.md", "--line", "1", "--shortcode", "@"}, 2, "drop --shortcode"},
 	} {
 		code := h.run(append([]string{"comment", "--worktree", "--body", "x"}, tc.args...)...)
 		if code != tc.code || !strings.Contains(h.stderr.String(), tc.msg) {

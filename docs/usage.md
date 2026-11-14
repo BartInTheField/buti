@@ -15,7 +15,7 @@ buti [-C dir] lsp
 | `--version` | print the version and exit |
 | `target` | a CLI id or branch name to select on start |
 
-The `but` CLI has to be on `PATH`, and the repository has to be set up with GitButler (`but setup`). `buti review`
+The `but` CLI, 0.23 or later, has to be on `PATH`; it works in any Git repository. `buti review`
 runs the [review commands](#review-comments-for-coding-agents) and `buti skill` installs the
 [agent skills](#resolving-comments-with-a-coding-agent), both without starting the TUI; to select a branch called
 `review` or `skill` on start, run `buti -- review`.
@@ -137,7 +137,7 @@ buti review clear [--resolved] [--dismissed]
 - `list --author user` (or `agent`) lists only one author's comments.
 - `comment` leaves a comment, as a reviewing agent does. `--line` and `--end-line` count lines on `--side`: `new` (the
   default) numbers the file after the change, which for uncommitted work is the file on disk; `old` numbers it before,
-  for lines the change removed. `--shortcode` says where the lines are: `zz`, a stack, a commit, a branch (the commit on
+  for lines the change removed. `--shortcode` says where the lines are: `@`, a stack, a commit, a branch (the commit on
   it that has the lines, preferring the one that changed them) or a file's own id (`rl`, `c3:m`, which also sets
   `--file`); without it, the uncommitted changes. The lines have to be in that diff, and the comment stores their text
   so it follows them like one left in buti.
@@ -156,7 +156,7 @@ buti review clear [--resolved] [--dismissed]
     "line": 42,
     "end_line": 42,
     "side": "new",
-    "shortcode": "zz",
+    "shortcode": "@",
     "file_shortcode": "k4",
     "kind": "unassigned",
     "branch": null,
@@ -172,7 +172,7 @@ buti review clear [--resolved] [--dismissed]
 | `status` | `open`, `resolved` or `dismissed` |
 | `author` | `user` for a comment left in buti, `agent` (or the `--author` name) for one left with `comment` |
 | `line`, `end_line`, `side` | the commented lines as they are now, counted on the `new` or `old` side of the diff |
-| `shortcode` | the GitButler cli id of what the comment is on: `zz` for unassigned changes, the stack's id for assigned ones, the commit's id for a commit; `null` when the commit is gone |
+| `shortcode` | the GitButler cli id of what the comment is on: `@` for unassigned changes, the stack's id for assigned ones, the commit's id for a commit; `null` when the commit is gone |
 | `file_shortcode` | the file's cli id within `shortcode`, e.g. to `but amend` it; `null` when the file isn't there |
 | `kind` | `unassigned`, `assigned` or `commit` |
 | `branch` | the branch of an assigned change or a commit, `null` for unassigned changes |
@@ -192,7 +192,7 @@ are handled too, by their severity tag: it fixes a `[must-fix]` (or replies when
 or `[nit]` when it is right for the code and dismisses it with the reason when it isn't, and answers a `[question]`.
 `/buti-resolve` then works on both unless you ask for only yours or only the agent's. For a comment on a commit, the agent fixes the working tree and then asks whether to
 amend the fix into that commit with `but amend`. It never runs git write commands. It ends with a summary per
-shortcode (`zz`, each stack, each commit).
+shortcode (`@`, each stack, each commit).
 
 Each skill is one agent-agnostic file, [`skills/buti-resolve/SKILL.md`](../skills/buti-resolve/SKILL.md) and
 [`skills/buti-review/SKILL.md`](../skills/buti-review/SKILL.md), which any agent that can follow a markdown skill and run
@@ -222,7 +222,7 @@ buti. The [skills CLI](https://github.com/vercel-labs/skills) can also install t
 For an agent that isn't listed, point `--target` at its skills directory. One without skills can take the file as a
 prompt: save it with `buti skill show buti-resolve > buti-resolve.md` and add it to the chat, for example with
 `/read-only buti-resolve.md` in Aider, then ask it to resolve the buti review comments. You can also give an argument:
-a comment id to fix only that one, or a shortcode (`zz`, a commit id) to fix only the comments there, as in
+a comment id to fix only that one, or a shortcode (`@`, a commit id) to fix only the comments there, as in
 `/buti-resolve c3`. `/buti-review` is invoked the same way (`/buti-review`, `$buti-review`, or ask for a review to read
 in buti).
 
@@ -231,7 +231,7 @@ in buti).
 `/buti-review` is the other direction: a coding agent reviews a diff and leaves its findings as comments for you to
 read in buti. It changes no code and never runs git write commands.
 
-1. Run `/buti-review` in your agent: with no argument it reviews the uncommitted changes (`zz`, unassigned and
+1. Run `/buti-review` in your agent: with no argument it reviews the uncommitted changes (`@`, unassigned and
    assigned); give it a commit (`/buti-review c3`) or a branch (`/buti-review auth`, each of its commits) to review
    that instead.
 2. The agent reads the diff with `but diff`, checks the comments already there so it doesn't repeat one, and leaves each

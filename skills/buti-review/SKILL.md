@@ -29,12 +29,12 @@ Run the commands from inside the repository, or pass `-C <dir>` before `review`.
 
 ## 2. Pick what to review
 
-Run `but status -f` to see the workspace: the uncommitted changes (`zz`, and those assigned to each stack), and each
+Run `but status -f` to see the workspace: the uncommitted changes (`@`, and those assigned to each stack), and each
 branch with its commits and their files. The first token on each line is its shortcode (cli id).
 
 The user may have given an argument:
 
-- **Nothing**, or **`zz`**: review the uncommitted changes, unassigned and assigned. `but diff` shows them all.
+- **Nothing**, or **`@`**: review the uncommitted changes, unassigned and assigned. `but diff` shows them all.
 - **A commit** shortcode, such as `c3`: review that commit. `but diff <commit>` shows it.
 - **A branch** name or shortcode: review each of its commits, oldest first, with `but diff <commit>` for each.
   `but diff <branch>` shows the whole branch at once, which helps to judge it as a whole, but comment on the commits.
@@ -70,7 +70,7 @@ buti review comment --file <path> --line <n> [--end-line <n>] [--side new|old] [
 - `--line` (and `--end-line` for a range) count lines as the file is after the change: the right-hand number column
   of `but diff`, which for uncommitted changes is the line number in the file on disk. On a line the change removed,
   pass `--side old` with the left-hand number, from before the change.
-- `--shortcode` says where the lines are: `zz`, a stack, a commit or a branch shortcode (a branch means the commit on
+- `--shortcode` says where the lines are: `@`, a stack, a commit or a branch shortcode (a branch means the commit on
   it that has the lines), or a file's own id from `but status -f` or `but diff` (such as `c3:m`), which also sets
   `--file`. Leave it out for uncommitted changes. Pass the commit's shortcode for a commit review.
 - The lines have to be in that diff: added, removed or shown as context. If the command says they are not, check the
@@ -98,7 +98,7 @@ are the safest.
 
 ## 5. Finish
 
-End with a short summary: what you reviewed (`zz`, the commit with its title, or the branch), how many comments of
+End with a short summary: what you reviewed (`@`, the commit with its title, or the branch), how many comments of
 each tag you left, and the `[must-fix]` ones in one line each with their file and line. Tell the user the comments show
 in buti under their lines (the palette's **Review comments…** lists them all), and that `/buti-resolve` can then work
 through them. If you found nothing worth a comment, say so and leave none.

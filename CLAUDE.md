@@ -55,7 +55,7 @@ building one inline, and update the table in `docs/testing.md`.
   way in new tests.
 - The harness drops commands that don't return within `h.wait` (the refresh tick, toast timers) and drops spinner and
   cursor-blink frames. If a new command seems to never deliver its message, that's the likely reason.
-- `but` 0.22 can't assign changes to a stack from the CLI, so the fixture has none.
+- `but` 0.23 can't assign changes to a stack from the CLI, so the fixture has none.
 - End-to-end tests need `but` on `PATH` and `BUTI_INTEGRATION=1`; without them they skip, and they don't fail.
 
 ## Conventions

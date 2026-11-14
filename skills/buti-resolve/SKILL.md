@@ -37,7 +37,7 @@ The user may have given an argument:
 
 - **A comment id** (or a prefix of one): only take that comment. `buti review show <id> --json` prints it, with its
   replies.
-- **A shortcode**, such as `zz` or a commit id like `c3`: only take the comments whose `shortcode` is that value.
+- **A shortcode**, such as `@` or a commit id like `c3`: only take the comments whose `shortcode` is that value.
 - **Only theirs, or only the review's:** add `--author user` or `--author agent` to the list command.
 
 Each comment is one object:
@@ -49,8 +49,8 @@ Each comment is one object:
 | `body` | the comment: a request, or a question |
 | `file`, `line`, `end_line`, `side` | the commented lines, now. `side` is `new` (the file as changed) or `old` (removed lines, which are no longer in the file) |
 | `context` | the commented lines marked `>`, with two lines of the diff around them. Trust this over the line numbers |
-| `kind` | `unassigned` (uncommitted, shortcode `zz`), `assigned` (uncommitted, assigned to a branch) or `commit` |
-| `shortcode` | the GitButler cli id of where the comment lives: `zz`, the stack's id, or the commit's id. `null` when the commit is gone |
+| `kind` | `unassigned` (uncommitted, shortcode `@`), `assigned` (uncommitted, assigned to a branch) or `commit` |
+| `shortcode` | the GitButler cli id of where the comment lives: `@`, the stack's id, or the commit's id. `null` when the commit is gone |
 | `file_shortcode` | the file's cli id within `shortcode` |
 | `branch`, `commit` | the branch, and for a commit comment `{"title", "sha"}` |
 | `outdated` | `true` when the commented lines, or the commit, are no longer there |
@@ -104,7 +104,7 @@ write commands for this.
 
 ## 6. Finish
 
-End with a short summary grouped by shortcode: `zz`, each stack, and each commit (with its title). Under each, list
+End with a short summary grouped by shortcode: `@`, each stack, and each commit (with its title). Under each, list
 the comments resolved (with the summary), replied to (with the question), dismissed (saying which were the agent's), and left open because they are
 outdated or orphaned, plus what is still uncommitted or was amended. Tell the user buti shows the resolutions and
 replies under each comment.

@@ -24,8 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Pinned so a new but release can't break PRs; bump both together.
-      BUT_URL: https://releases.gitbutler.com/releases/release/0.22.3-3234/linux/x86_64/but
-      BUT_SHA256: 3f4f543a6ccd931ce6c86c484058dbe5e29439597d001f6a0a9c28d9e533ea18
+      BUT_URL: https://releases.gitbutler.com/releases/release/0.23.4-3353/linux/x86_64/but
+      BUT_SHA256: e7a84eb2bc67fcd42bbd607d9442dbfc698e5b3af43c0a65efdf5168dca9d4ff
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6

@@ -53,7 +53,7 @@ body:
     attributes:
       label: GitButler CLI version
       description: Output of `but --version`.
-      placeholder: but 0.22.3
+      placeholder: but 0.23.4
     validations:
       required: true
   - type: input

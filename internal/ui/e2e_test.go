@@ -355,7 +355,7 @@ func TestE2EAgentReview(t *testing.T) {
 	h.keys("ctrl+p")
 	h.typeText("review comments")
 	h.keys("enter")
-	h.wantOnScreen("README.md line 7  [suggestion]", "agent · zz", "src/auth/token.go line 3  [must-fix]")
+	h.wantOnScreen("README.md line 7  [suggestion]", "agent · @", "src/auth/token.go line 3  [must-fix]")
 	h.snap("palette")
 }
 

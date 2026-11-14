@@ -420,7 +420,7 @@ func (m *Model) selected() entity {
 	}
 	if m.focus == focusFiles {
 		if m.fileCursor < 0 || m.fileCursor >= len(m.files) {
-			return entity{kind: entArea, id: "zz", label: "all changes"}
+			return entity{kind: entArea, id: "@", label: "all changes"}
 		}
 		return m.files[m.fileCursor].entity()
 	}
@@ -1088,7 +1088,7 @@ func (m *Model) sidebarView(width, height int) string {
 	if m.status != nil {
 		count = len(m.status.UncommittedChanges)
 	}
-	area := entity{kind: entArea, id: "zz"}
+	area := entity{kind: entArea, id: "@"}
 	ad := m.deco(area)
 	title := headerStyle.Render("Unstaged")
 	if m.focus == focusFiles {

@@ -27,7 +27,7 @@ func comment(ctx context.Context, args []string, env Env) error {
 	line := fs.Int("line", 0, "the first line, numbered on --side")
 	endLine := fs.Int("end-line", 0, "the last line of a range (default --line)")
 	side := fs.String("side", string(review.SideNew), "new (the file as changed) or old (removed lines)")
-	shortcode := fs.String("shortcode", "", "where the lines are: zz, a stack, a commit, a branch or a file's id (default: the uncommitted changes)")
+	shortcode := fs.String("shortcode", "", "where the lines are: @, a stack, a commit, a branch or a file's id (default: the uncommitted changes)")
 	worktree := fs.Bool("worktree", false, "count --line in the file on disk (the new side); anchor it on the uncommitted changes or the commit that has the lines")
 	body := fs.String("body", "", "the comment (default: ask on the terminal)")
 	author := fs.String("author", "agent", "who is commenting")
@@ -36,6 +36,9 @@ func comment(ctx context.Context, args []string, env Env) error {
 	}
 	if *endLine == 0 {
 		*endLine = *line
+	}
+	if *shortcode == "zz" { // `but` before 0.23 called the uncommitted changes zz; older installed skills still pass it
+		*shortcode = review.TargetUnassigned
 	}
 	var problem string
 	switch {
@@ -414,7 +417,7 @@ func candidates(st *but.Status, shortcode, path string) ([]candidate, error) {
 		return out, nil
 	case shortcode == review.TargetUnassigned:
 		if unassigned(); len(out) == 0 {
-			return nil, notHere("zz (the unassigned changes)")
+			return nil, notHere("@ (the unassigned changes)")
 		}
 		return out, nil
 	}
@@ -454,7 +457,7 @@ func candidates(st *but.Status, shortcode, path string) ([]candidate, error) {
 	return nil, errors.New("no stack, commit or branch " + shortcode + " in the workspace; run `but status` for the shortcodes")
 }
 
-// fileShortcode finds the file whose cli id is id, and the shortcode of where it is: zz, its stack or its commit.
+// fileShortcode finds the file whose cli id is id, and the shortcode of where it is: @, its stack or its commit.
 func fileShortcode(st *but.Status, id string) (owner, path string, ok bool) {
 	if id == "" {
 		return "", "", false

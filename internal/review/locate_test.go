@@ -125,7 +125,7 @@ func TestLocateCommitFollowsUncommit(t *testing.T) {
 	f.st.UncommittedChanges = append(f.st.UncommittedChanges, but.Change{CliID: "tk", FilePath: "src/auth/token.go"})
 	f.diffs["tk"] = fileDiff("src/auth/token.go", tokenV2)
 	l := locateOne(t, f, tokenAnchor())
-	if l.Status != StatusOpen || l.Target != "zz" || l.FileID != "tk" {
+	if l.Status != StatusOpen || l.Target != "@" || l.FileID != "tk" {
 		t.Fatalf("got %+v", l)
 	}
 	want := Anchor{Kind: KindUnassigned, Path: "src/auth/token.go", Side: SideNew, Line: 5, EndLine: 5,
@@ -209,7 +209,7 @@ func TestLocateNearestMatch(t *testing.T) {
 func TestLocateUnassigned(t *testing.T) {
 	a := Anchor{Kind: KindUnassigned, Path: "README.md", Side: SideNew, Line: 2, EndLine: 2, LineText: "new"}
 	l := locateOne(t, workspace("c1", tokenV1), a)
-	if l.Status != StatusOpen || l.Moved() || l.Target != "zz" || l.FileID != "rl" {
+	if l.Status != StatusOpen || l.Moved() || l.Target != "@" || l.FileID != "rl" {
 		t.Fatalf("got %+v", l)
 	}
 	// The old side counts old line numbers.
@@ -218,7 +218,7 @@ func TestLocateUnassigned(t *testing.T) {
 		t.Fatalf("old side: %+v", l)
 	}
 	a.LineText = "new"
-	if l := locateOne(t, workspace("c1", tokenV1), a); l.Status != StatusOutdated || l.Target != "zz" {
+	if l := locateOne(t, workspace("c1", tokenV1), a); l.Status != StatusOutdated || l.Target != "@" {
 		t.Fatalf("old side mismatch: %+v", l)
 	}
 }
@@ -235,7 +235,7 @@ func TestLocateAssigned(t *testing.T) {
 	f.st.UncommittedChanges = append(f.st.UncommittedChanges, but.Change{CliID: "da", FilePath: "docs/a.md"})
 	f.diffs["da"] = fileDiff("docs/a.md", "@@ -0,0 +1,1 @@\n+hello\n")
 	l = locateOne(t, f, a)
-	if l.Status != StatusOpen || l.Anchor.Kind != KindUnassigned || l.Anchor.Branch != "" || l.Target != "zz" || l.FileID != "da" {
+	if l.Status != StatusOpen || l.Anchor.Kind != KindUnassigned || l.Anchor.Branch != "" || l.Target != "@" || l.FileID != "da" {
 		t.Fatalf("unassigned: %+v", l)
 	}
 	// A branch whose stack is gone and a file that is nowhere.
@@ -366,7 +366,7 @@ func TestLocateLaterHunk(t *testing.T) {
 	first, second := fileDiff("README.md", "@@ -1,1 +1,2 @@\n # demo\n+intro\n"), fileDiff("README.md", "@@ -40,1 +41,2 @@\n end\n+appendix\n")
 	f.diffs["rl"] = &but.Diff{Changes: append(first.Changes, second.Changes...)}
 	a := Anchor{Kind: KindUnassigned, Path: "README.md", Side: SideNew, Line: 42, EndLine: 42, LineText: "appendix"}
-	if l := locateOne(t, f, a); l.Status != StatusOpen || l.Moved() || l.Target != "zz" {
+	if l := locateOne(t, f, a); l.Status != StatusOpen || l.Moved() || l.Target != "@" {
 		t.Fatalf("got %+v", l)
 	}
 }

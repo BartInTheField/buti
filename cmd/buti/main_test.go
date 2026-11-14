@@ -153,7 +153,7 @@ func TestIntegrationReviewList(t *testing.T) {
 		!strings.Contains(c["context"].(string), "> 3 | "+secret) {
 		t.Errorf("commit comment:\n%s", out)
 	}
-	if u["id"] != onReadme.ID || u["shortcode"] != "zz" || u["file_shortcode"] != readmeID || u["kind"] != "unassigned" ||
+	if u["id"] != onReadme.ID || u["shortcode"] != "@" || u["file_shortcode"] != readmeID || u["kind"] != "unassigned" ||
 		u["branch"] != nil || u["commit"] != nil || u["line"] != 5.0 || u["end_line"] != 5.0 ||
 		!strings.Contains(u["context"].(string), "> 5 | ## Usage") {
 		t.Errorf("uncommitted comment:\n%s", out)
