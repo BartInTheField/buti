@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# Prepares an Amp orb for buti: the mise toolchain, the `but` CLI pinned in CI, and VHS for recording the TUI.
+# Runs on a fresh orb and again on a stale snapshot, so every step skips work that is already done.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+bin="$HOME/.local/bin"
+mkdir -p "$bin"
+export PATH="$bin:$HOME/.local/share/mise/shims:$PATH"
+
+step() { printf '\n== %s (%ss)\n' "$1" "$SECONDS"; }
+
+step "mise"
+command -v mise >/dev/null || curl -fsSL https://mise.run | MISE_QUIET=1 sh
+mise trust --quiet mise.toml
+
+step "toolchain from mise.toml (go, golangci-lint, freeze, rust)"
+mise install --yes
+mise exec -- rustup target add wasm32-wasip2 >/dev/null
+
+# The same release and checksum as the integration job, so local runs match CI.
+step "but"
+but_url="$(sed -n 's/^ *BUT_URL: *//p' .github/workflows/test.yml)"
+but_sha="$(sed -n 's/^ *BUT_SHA256: *//p' .github/workflows/test.yml)"
+if ! echo "$but_sha  $bin/but" | sha256sum -c --status - 2>/dev/null; then
+  curl -fsSL -o "$bin/but" "$but_url"
+  echo "$but_sha  $bin/but" | sha256sum -c -
+  chmod +x "$bin/but"
+fi
+"$bin/but" --version
+
+# VHS drives ttyd in Chrome. The symlink makes it reuse agent-browser's Chrome instead of downloading 500 MB.
+step "vhs and ttyd (orb only, not in mise.toml)"
+mise use --global --yes vhs@0.12.1 ttyd@1.7.7
+chrome="$(ls -d "$HOME"/.agent-browser/browsers/chrome-*/chrome 2>/dev/null | sort -V | tail -1 || true)"
+if [ -n "$chrome" ]; then ln -sfn "$chrome" "$bin/chromium"; fi
+
+# freeze's PNG rasteriser (resvg on wazero) segfaults in orb VMs on every render, so the e2e snaps would only get
+# .ansi files. This wrapper, ahead of mise on PATH, lets freeze write SVG and rasterises it with rsvg-convert.
+step "freeze PNG wrapper"
+missing=()
+for pkg in librsvg2-bin fonts-jetbrains-mono fonts-dejavu-core; do
+  dpkg -s "$pkg" >/dev/null 2>&1 || missing+=("$pkg")
+done
+if [ ${#missing[@]} -gt 0 ]; then
+  sudo apt-get update -qq
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}" >/dev/null
+fi
+# Glyphs JetBrains Mono lacks, such as ⇡, fall back to a monospace font so they keep the cell width.
+mkdir -p "$HOME/.config/fontconfig/conf.d"
+cat >"$HOME/.config/fontconfig/conf.d/60-buti-mono.conf" <<'EOF'
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <alias><family>JetBrains Mono</family><prefer><family>JetBrains Mono</family><family>DejaVu Sans Mono</family></prefer></alias>
+</fontconfig>
+EOF
+cat >"$bin/freeze" <<EOF
+#!/usr/bin/env bash
+# Written by buti's .agents/setup: freeze's own PNG output crashes in orbs, so render SVG and convert it.
+set -euo pipefail
+real="$(mise which freeze)"
+args=() out=""
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    -o | --output) out="\$2"; shift 2 ;;
+    --output=*) out="\${1#*=}"; shift ;;
+    *) args+=("\$1"); shift ;;
+  esac
+done
+if [[ "\$out" != *.png ]]; then exec "\$real" "\$@"; fi
+svg="\$(mktemp --suffix .svg)"
+trap 'rm -f "\$svg"' EXIT
+"\$real" "\${args[@]}" --output "\$svg"
+rsvg-convert --zoom 2 --output "\$out" "\$svg"
+EOF
+chmod +x "$bin/freeze"
+
+step "go modules and build cache"
+go mod download
+go build -o bin/buti ./cmd/buti
+go vet ./...
+
+# Amp and orb services start in non-interactive login shells, which read ~/.bash_profile.
+step "shell profile"
+marker="# buti: mise toolchain"
+if ! grep -Fqx "$marker" "$HOME/.bash_profile" 2>/dev/null; then
+  cat >>"$HOME/.bash_profile" <<'EOF'
+
+# buti: mise toolchain
+export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
+EOF
+fi
+
+step "agent guidance"
+guidance="$HOME/.config/amp/AGENTS.md"
+mkdir -p "$(dirname "$guidance")"
+touch "$guidance"
+sed -i '/^<!-- buti orb: start -->$/,/^<!-- buti orb: end -->$/d' "$guidance"
+cat >>"$guidance" <<EOF
+<!-- buti orb: start -->
+# buti in this orb
+
+- mise, Go, golangci-lint, freeze, Rust, \`but\` (pinned to CI), VHS and ttyd are installed; \`mise run test\`,
+  \`mise run test:integration\` and \`mise run screenshots\` work as CLAUDE.md describes. The full e2e suite takes about
+  5 minutes here; for one screen run \`BUTI_INTEGRATION=1 BUTI_SCREENSHOTS=\$PWD/screenshots go test -count=1 -run
+  'E2E<Name>' ./internal/ui\`. \`freeze\` in ~/.local/bin is a wrapper (its own PNG output crashes in orbs).
+- \`$repo_root/.amp/buti run [-conflict]\` builds buti and runs it on a fresh test repository. Run it in the Terminal
+  tab's tmux session to show the user buti live.
+- \`$repo_root/.amp/buti record <tape> [-conflict]\` records a VHS tape against a fresh test repository; videos and
+  screenshots land in \`.amp/in/artifacts/\`. Copy \`.amp/tapes/example.tape\` for a new feature, then embed the
+  .mp4 and .png files in your reply to report what you built.
+<!-- buti orb: end -->
+EOF
+
+step "done"

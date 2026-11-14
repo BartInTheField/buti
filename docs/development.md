@@ -19,6 +19,17 @@ mise run fixture            # create the test repository to try buti by hand
 The integration tests and the fixture need the [GitButler CLI](https://docs.gitbutler.com/cli-guides/installation) on
 `PATH`. See [Testing](testing.md) for how the tests are put together.
 
+### Amp orbs
+
+[Amp orbs](https://ampcode.com/docs/orbs) run `.agents/setup`, which installs the mise toolchain, the `but` release
+pinned in CI, and [VHS](https://github.com/charmbracelet/vhs) with ttyd. In an orb, `.amp/buti` shows buti against a
+fresh test repository:
+
+```sh
+.amp/buti run [-conflict]                        # run it live, e.g. in the Terminal tab
+.amp/buti record .amp/tapes/example.tape         # record a tape -> .amp/in/artifacts/*.mp4, *.png
+```
+
 ## Layout
 
 - `cmd/buti`: entrypoint and flags; dispatches `buti review` and `buti skill` (`skill.go`) before the TUI
