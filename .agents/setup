@@ -61,15 +61,16 @@ cat >"$bin/freeze" <<EOF
 # Written by buti's .agents/setup: freeze's own PNG output crashes in orbs, so render SVG and convert it.
 set -euo pipefail
 real="$(mise which freeze)"
-args=() out=""
+orig=("\$@") args=() out="freeze.png" render=1
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -o | --output) out="\$2"; shift 2 ;;
     --output=*) out="\${1#*=}"; shift ;;
+    -h | --help | -v | --version) render=0; shift ;;
     *) args+=("\$1"); shift ;;
   esac
 done
-if [[ "\$out" != *.png ]]; then exec "\$real" "\$@"; fi
+if [ "\$render" = 0 ] || [[ "\$out" != *.png ]]; then exec "\$real" "\${orig[@]}"; fi
 svg="\$(mktemp --suffix .svg)"
 trap 'rm -f "\$svg"' EXIT
 "\$real" "\${args[@]}" --output "\$svg"
