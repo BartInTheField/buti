@@ -661,4 +661,14 @@ func TestE2EWorktreeSwitcher(t *testing.T) {
 	h.run(h.m.fetchStatus())
 	h.wantOnScreen("⑂ hotfix-login", "on api", "Fix the login redirect")
 	h.snap("start-in-worktree")
+
+	// Removed from another terminal while buti views it: buti goes back to the workspace.
+	rm := exec.Command("but", "worktree", "remove", "hotfix-login")
+	rm.Dir = r.Dir
+	if out, err := rm.CombinedOutput(); err != nil {
+		t.Fatalf("but worktree remove: %v\n%s", err, out)
+	}
+	h.run(h.m.fetchStatus())
+	h.wantOnScreen("⌂ workspace", "Worktree hotfix-login is gone. Viewing the workspace", "Bump Go version")
+	h.snap("worktree-removed")
 }
