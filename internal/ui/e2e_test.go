@@ -591,3 +591,74 @@ func TestE2EZedDiff(t *testing.T) {
 		t.Errorf("old side equals the worktree file %q", newB)
 	}
 }
+
+func TestE2EWorktreeSwitcher(t *testing.T) {
+	h, r := newRepoHarness(t)
+	if err := r.Worktrees(); err != nil {
+		t.Fatal(err)
+	}
+	h.run(h.m.fetchStatus())
+	h.wantOnScreen("⌂ workspace", "3 stacks · 4 changes", "2 other worktrees", "w switch", "Bump Go version")
+	h.snap("workspace")
+
+	h.keys("w")
+	h.wantOnScreen("Switch worktree", "⑂ search", "⑂ hotfix-login", "on api", "New worktree…")
+	h.snap("picker")
+	h.typeText("search")
+	h.keys("enter")
+	h.wantOnScreen("⑂ search", "1 commit · 1 change", "Add a search index", "search_test.go")
+	if s := h.screen(); strings.Contains(s, "Bump Go version") || strings.Contains(s, "README.md") {
+		t.Fatalf("the workspace still shows in the search worktree:\n%s", s)
+	}
+	h.snap("search")
+
+	// A commit made in the worktree lands on its branch, and leaves the workspace alone.
+	h.selectText("search_test.go")
+	h.keys("c")
+	h.hover("branch:search")
+	h.keys("enter")
+	h.typeText("Test the search index")
+	h.keys("enter")
+	h.wantOnScreen("Test the search index", "2 commits · 0 changes")
+	h.snap("search-committed")
+	if wt := h.status().Worktree("search"); wt == nil || len(wt.Branches[0].Commits) != 2 || len(wt.UncommittedChanges) != 0 {
+		t.Fatalf("search worktree: %+v", wt)
+	}
+
+	// A worktree's branches are one stack: b stacks a new branch on the selected one.
+	h.hover("branch:search")
+	h.keys("b")
+	h.typeText("search-ui")
+	h.keys("enter")
+	h.wantOnScreen("search-ui")
+	h.snap("search-stacked")
+	if wt := h.status().Worktree("search"); wt == nil || len(wt.Branches) != 2 || wt.Branches[0].Name != "search-ui" {
+		t.Fatalf("search worktree after b: %+v", wt)
+	}
+
+	// The header opens the picker too; this one creates a worktree and switches to it.
+	h.click("⑂ search")
+	h.typeText("new worktree")
+	h.keys("enter")
+	h.typeText("docs-refresh")
+	h.snap("new-prompt")
+	h.keys("enter")
+	h.wantOnScreen("⑂ docs-refresh", "0 commits · 0 changes", "3 other worktrees")
+	h.snap("created")
+
+	h.keys("w")
+	h.typeText("workspace")
+	h.keys("enter")
+	h.wantOnScreen("⌂ workspace", "Bump Go version", "README.md")
+
+	// Started in a worktree's directory, buti opens that worktree (cmd/buti does this with but.OpenWorktree).
+	ws, wt, err := but.OpenWorktree(context.Background(), filepath.Join(r.Worktree("hotfix-login"), "src"))
+	if err != nil || wt == nil {
+		t.Fatalf("OpenWorktree: %v, %v", wt, err)
+	}
+	h.m = New(ws, Options{Worktree: wt})
+	h.send(tea.WindowSizeMsg{Width: 160, Height: 40})
+	h.run(h.m.fetchStatus())
+	h.wantOnScreen("⑂ hotfix-login", "on api", "Fix the login redirect")
+	h.snap("start-in-worktree")
+}

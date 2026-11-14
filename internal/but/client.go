@@ -83,6 +83,7 @@ type Status struct {
 	Stacks             []Stack       `json:"stacks"`
 	MergeBase          Commit        `json:"mergeBase"`
 	UpstreamState      UpstreamState `json:"upstreamState"`
+	Worktrees          []Worktree    `json:"worktrees"`
 
 	Resolving *Resolution `json:"-"` // set in edit mode, when the rest is empty
 }

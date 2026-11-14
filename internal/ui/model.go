@@ -41,23 +41,32 @@ type Options struct {
 	UpdateCheck bool          // offer a newer release on start
 	UpdateCache string        // where the latest release version is cached between runs
 	Review      *review.Store // where review comments are kept; nil turns them off
+	// Worktree is a linked worktree to open on start, when buti starts in one. The client then runs in the workspace.
+	Worktree *but.WorktreeListing
 }
 
 type (
 	statusMsg struct {
-		status *but.Status
-		err    error
+		status   *but.Status
+		err      error
+		worktree string // the worktree it was fetched for
 	}
 	tickMsg struct{}
 )
 
 type Model struct {
-	client *but.Client
+	client *but.Client // runs in the worktree being viewed
+	root   *but.Client // runs in the workspace
 	opts   Options
-	status *but.Status
-	err    error
-	loaded bool
-	focus  focusArea
+	status *but.Status // what is shown: the workspace, or the worktree being viewed
+	all    *but.Status // the last status, with every worktree
+
+	worktree  string            // the linked worktree being viewed, "" for the workspace
+	wtPaths   map[string]string // where each worktree is checked out, by name
+	wtLocated string            // the worktree names wtPaths was last fetched for
+	err       error
+	loaded    bool
+	focus     focusArea
 
 	// Unstaged file tree (sidebar). fileCursor -1 is the "Unstaged" header: all changes.
 	files      []fileRow
@@ -110,6 +119,8 @@ type Model struct {
 func New(client *but.Client, opts Options) Model {
 	m := Model{
 		client:     client,
+		root:       client,
+		wtPaths:    map[string]string{},
 		opts:       opts,
 		collapsed:  map[string]bool{},
 		showFiles:  map[string]bool{},
@@ -120,6 +131,10 @@ func New(client *but.Client, opts Options) Model {
 		fileCursor: -1,
 	}
 	m.det.visible = opts.ShowDetails
+	if w := opts.Worktree; w != nil {
+		m.worktree, m.wtPaths[w.Name] = w.Name, w.Path
+		m.client = &but.Client{Dir: w.Path, Bin: client.Bin}
+	}
 	return m
 }
 
@@ -128,17 +143,19 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) fetchStatus() tea.Cmd {
+	client, wt := m.client, m.worktree
 	return func() tea.Msg {
-		s, err := m.client.Status(context.Background())
-		return statusMsg{status: s, err: err}
+		s, err := client.Status(context.Background())
+		return statusMsg{status: s, err: err, worktree: wt}
 	}
 }
 
 // fetchSyncedStatus is fetchStatus with pull requests synced from the forge.
 func (m Model) fetchSyncedStatus() tea.Cmd {
+	client, wt := m.client, m.worktree
 	return func() tea.Msg {
-		s, err := m.client.SyncedStatus(context.Background())
-		return statusMsg{status: s, err: err}
+		s, err := client.SyncedStatus(context.Background())
+		return statusMsg{status: s, err: err, worktree: wt}
 	}
 }
 
@@ -171,12 +188,25 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 		return tea.Batch(m.fetchStatus(), tick())
 
 	case statusMsg:
-		m.err = msg.err
-		if msg.err == nil {
-			m.applyStatus(msg.status)
-			return m.loadComments(false)
+		if msg.worktree != m.worktree {
+			return nil // fetched before a switch
 		}
-		return nil
+		m.err = msg.err
+		if msg.err != nil {
+			return nil
+		}
+		view, ok := m.viewStatus(msg.status)
+		if !ok {
+			return m.switchWorktreeSaying("", "", "Worktree "+m.worktree+" is gone. ")
+		}
+		m.applyStatus(view)
+		return tea.Batch(m.loadComments(false), m.locateWorktrees())
+
+	case worktreePathsMsg:
+		return m.receiveWorktreePaths(msg)
+
+	case worktreeCreatedMsg:
+		return m.handleWorktreeCreated(msg)
 
 	case commentsMsg:
 		return m.receiveComments(msg)
@@ -330,9 +360,12 @@ func (m *Model) rebuild() {
 		m.editing = nil // edit mode is over, or entering it failed
 	}
 	m.files = buildFileRows(m.status.UncommittedChanges, m.collapsed)
-	m.lanes = append(buildLanes(m.status, func(c *but.Commit) bool {
+	m.lanes = buildLanes(m.status, func(c *but.Commit) bool {
 		return m.showAllFiles || m.showFiles[commitKey(c)]
-	}), phantomLane())
+	})
+	if m.worktree == "" {
+		m.lanes = append(m.lanes, phantomLane()) // `but` refuses unstacked branches in a worktree
+	}
 	m.selectKey(prev)
 }
 
@@ -887,7 +920,7 @@ func (m *Model) handleTreeKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 
 func clamp(v, lo, hi int) int { return max(lo, min(v, hi)) }
 
-func (m *Model) bodyHeight() int { return max(m.height-1, 1) } // minus footer
+func (m *Model) bodyHeight() int { return max(m.height-1-m.headerHeight(), 1) } // minus footer and header
 // sidebarWidth is the file tree's width: a share of the screen, or the width it was dragged to.
 func (m *Model) sidebarWidth() int {
 	w := m.sidebarW
@@ -1031,6 +1064,9 @@ func (m *Model) render() string {
 		body = m.workspaceView()
 	}
 	out := lipgloss.JoinVertical(lipgloss.Left, body, m.footer())
+	if m.headerHeight() > 0 {
+		out = m.header() + "\n" + out
+	}
 	if m.drag != nil && m.drag.moved {
 		out = m.overlayGhost(out)
 	}

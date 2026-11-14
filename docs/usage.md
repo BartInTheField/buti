@@ -68,6 +68,19 @@ The drop does the natural thing:
 | branch | branch | stack it onto the branch |
 | branch | new-branch lane | unstack it |
 
+## Worktrees
+
+GitButler 0.23 can check a branch out in a linked worktree of its own (`but worktree new`), beside the workspace.
+When there are any, a header line shows which one buti is viewing: **⌂ workspace**, or the worktree's name, commits,
+uncommitted changes, where its branch starts and its directory. `w` (or a click on the header) opens **Switch
+worktree**, a picker over the workspace and every worktree, which also creates one (**New worktree…**). Started in a
+worktree's directory, buti opens that worktree.
+
+In a worktree, **Unstaged** holds its uncommitted changes and its branches are the one lane; commands run in its
+directory, so a commit lands on its branch. `but` keeps a worktree's branches in one stack, so `b` there stacks a new
+branch on the selected one and there is no "new branch" lane. Absorb, apply, unapply and cleaning up empty branches
+aren't offered: `but` refuses them in a worktree, or does them to the workspace.
+
 ## Conflicts
 
 A conflicted commit (`✗`) is resolved in edit mode: select it and press `e`, then fix its files in your editor. See

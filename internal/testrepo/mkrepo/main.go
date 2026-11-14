@@ -1,7 +1,7 @@
 // Command mkrepo creates the fixture repository from package testrepo, to try
 // buti against by hand:
 //
-//	go run ./internal/testrepo/mkrepo [-conflict] /tmp/buti-fixture
+//	go run ./internal/testrepo/mkrepo [-conflict] [-worktrees] /tmp/buti-fixture
 package main
 
 import (
@@ -14,8 +14,9 @@ import (
 
 func main() {
 	conflict := flag.Bool("conflict", false, "pull into a conflicted commit (testrepo.Repo.Conflict)")
+	worktrees := flag.Bool("worktrees", false, "add two linked worktrees (testrepo.Repo.Worktrees)")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: mkrepo [-conflict] <dir>")
+		fmt.Fprintln(os.Stderr, "usage: mkrepo [-conflict] [-worktrees] <dir>")
 	}
 	flag.Parse()
 	if flag.NArg() != 1 {
@@ -25,6 +26,9 @@ func main() {
 	r, err := testrepo.Create(flag.Arg(0))
 	if err == nil && *conflict {
 		err = r.Conflict()
+	}
+	if err == nil && *worktrees {
+		err = r.Worktrees()
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mkrepo:", err)

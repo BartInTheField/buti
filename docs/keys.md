@@ -32,6 +32,7 @@
 | `o` / `O` | open a file in your editor, at the cursor's line ([Zed](zed.md#open-files-at-the-line)) / with the default app; `o` on a branch with a pull request opens it in the browser |
 | `Z` | open the diff of a file, hunk, commit, branch or all uncommitted changes in [Zed](zed.md#diffs-in-zed) |
 | `/` / `t` | go to anything (fuzzy) / go to a branch |
+| `w` | switch worktree: the workspace or a linked worktree, or create one ([Worktrees](usage.md#worktrees)) |
 | `:` / `!` | run a `but` command (the output is shown) / a shell command |
 | `ctrl+p` | command palette (also holds commands without a key: **Version**, **Update buti**) |
 | `j` `k` `h` `l` · `J` `K` · `g` `G` | move · next/previous branch · top/bottom |

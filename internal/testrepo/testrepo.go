@@ -140,7 +140,10 @@ func (b *builder) write(name, content string) {
 	if b.err != nil {
 		return
 	}
-	p := filepath.Join(b.r.Dir, name)
+	p := name
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(b.r.Dir, name)
+	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		b.err = err
 		return
@@ -235,6 +238,28 @@ func (r *Repo) Conflict() error {
 	b.commit("changelog", "Start a changelog", "CHANGELOG.md")
 	b.run("but", "pull")
 	return b.err
+}
+
+// Worktrees adds two linked worktrees (GitButler 0.23):
+//
+//	search        a new branch at the base, 1 commit and 1 uncommitted file
+//	hotfix-login  a new branch above api, 1 commit, no changes
+func (r *Repo) Worktrees() error {
+	b := &builder{r: r}
+	b.run("but", "worktree", "new", "search")
+	b.run("but", "worktree", "new", "--above", "api", "hotfix-login")
+	search, hotfix := r.Worktree("search"), r.Worktree("hotfix-login")
+	b.write(filepath.Join(search, "src/search.go"), "package demo\n\nfunc Search(q string) []string { return nil }\n")
+	b.run("@"+search, "but", "commit", "--message", "Add a search index")
+	b.write(filepath.Join(search, "src/search_test.go"), "package demo\n\nimport \"testing\"\n\nfunc TestSearch(t *testing.T) {}\n")
+	b.write(filepath.Join(hotfix, "src/api/login.go"), "package api\n\nconst LoginRedirect = \"/home\"\n")
+	b.run("@"+hotfix, "but", "commit", "--message", "Fix the login redirect")
+	return b.err
+}
+
+// Worktree is the directory of the worktree named name, where `but worktree new` checks it out.
+func (r *Repo) Worktree(name string) string {
+	return filepath.Join(r.Home, ".gitbutler-worktrees", filepath.Base(r.Dir), name)
 }
 
 const serverGo = `package demo

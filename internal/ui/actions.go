@@ -22,13 +22,15 @@ type action struct {
 	// resolving: also offered in edit mode, which hides the others (the
 	// workspace is set aside, so they would act on nothing or get in the way).
 	resolving bool
+	// workspace: only offered in the workspace. In a linked worktree `but` refuses it, or does it to the workspace.
+	workspace bool
 	when      func(m *Model, sel []entity) bool
 	run       func(m *Model, sel []entity) tea.Cmd
 }
 
 // offers reports whether a is available for sel in the current mode.
 func (m *Model) offers(a action, sel []entity) bool {
-	return (a.resolving || !m.resolving()) && a.when(m, sel)
+	return (a.resolving || !m.resolving()) && (!a.workspace || m.worktree == "") && a.when(m, sel)
 }
 
 func always(*Model, []entity) bool { return true }
@@ -100,7 +102,7 @@ func init() {
 					return c.Amend(ctx, t.id, nil)
 				})
 			}},
-		{key: "A", title: "Absorb into matching commits", group: "Commit",
+		{key: "A", title: "Absorb into matching commits", group: "Commit", workspace: true,
 			when: func(m *Model, sel []entity) bool {
 				return hasUncommitted(m) && any_(entArea, entDir, entFile, entHunk)(m, sel)
 			},
@@ -143,7 +145,9 @@ func init() {
 			run: func(m *Model, sel []entity) tea.Cmd { return m.enterTarget(verbMove, sel) }},
 		{key: "p", title: "Cherry-pick…", group: "Branch", when: verbAvailable(verbPick),
 			run: func(m *Model, sel []entity) tea.Cmd { return m.enterTarget(verbPick, sel) }},
-		{key: "b", title: "New branch…", group: "Branch", when: always, run: (*Model).newBranch},
+		// A worktree's branches are one stack: a new branch there has to go on top of or below one of them.
+		{key: "b", title: "New branch…", group: "Branch", run: (*Model).newBranch,
+			when: func(m *Model, sel []entity) bool { return m.worktree == "" || one(entBranch, entCommit)(m, sel) }},
 		{key: "B", title: "New branch below…", group: "Branch", when: one(entBranch),
 			run: func(m *Model, sel []entity) tea.Cmd {
 				return m.promptNewBranch(but.Placement{Below: sel[0].id}, "below "+sel[0].label)
@@ -159,8 +163,8 @@ func init() {
 		{key: "o", title: "Open pull request", group: "Branch", hint: "open PR",
 			when: func(m *Model, sel []entity) bool { return one(entBranch)(m, sel) && m.branchPR(sel[0]) != "" },
 			run:  (*Model).openPR},
-		{key: "a", title: "Apply branch…", group: "Branch", global: true, when: always, run: (*Model).applyPicker},
-		{key: "S", title: "Unapply stack", group: "Branch", when: one(entBranch, entCommit),
+		{key: "a", title: "Apply branch…", group: "Branch", global: true, workspace: true, when: always, run: (*Model).applyPicker},
+		{key: "S", title: "Unapply stack", group: "Branch", workspace: true, when: one(entBranch, entCommit),
 			run: func(m *Model, sel []entity) tea.Cmd {
 				b := sel[0].branch
 				return m.runOp("Unapply "+b, keepSelection, func(ctx context.Context, c *but.Client) error { return c.Unapply(ctx, b) })
@@ -182,7 +186,7 @@ func init() {
 			run: func(m *Model, _ []entity) tea.Cmd {
 				return m.runOp("Pull upstream changes", keepSelection, func(ctx context.Context, c *but.Client) error { return c.Pull(ctx) })
 			}},
-		{key: "", title: "Clean up empty branches", group: "Branch", global: true, when: always,
+		{key: "", title: "Clean up empty branches", group: "Branch", global: true, workspace: true, when: always,
 			run: func(m *Model, _ []entity) tea.Cmd {
 				return m.runOpOut("Clean up empty branches", keepSelection, func(ctx context.Context, c *but.Client) (string, error) {
 					return c.Exec(ctx, "clean")
@@ -240,6 +244,7 @@ func init() {
 			run: func(m *Model, _ []entity) tea.Cmd { m.det.stepHunk(-1, m.hunkMarks()); return nil }},
 		{key: "/", title: "Go to…", group: "View", global: true, when: always, run: (*Model).gotoPicker},
 		{key: "t", title: "Go to branch…", group: "View", global: true, when: always, run: (*Model).branchPicker},
+		{key: "w", title: "Switch worktree…", group: "View", global: true, when: always, run: (*Model).worktreePicker},
 		{key: ":", title: "Run a but command…", group: "View", global: true, resolving: true, when: always, run: (*Model).butPrompt},
 		{key: "!", title: "Run a shell command…", group: "View", global: true, resolving: true, when: always, run: (*Model).shellPrompt},
 		{key: "ctrl+r", title: "Reload", group: "View", global: true, resolving: true, when: always,

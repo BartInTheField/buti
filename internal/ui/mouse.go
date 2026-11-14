@@ -37,7 +37,8 @@ const (
 	hitTreeSplit    // the divider between that tree and the diff
 	hitSidebarSplit // the divider between the sidebar and the lanes
 	hitDetailsClose
-	hitButton // an edit mode button; key is its action's
+	hitButton    // an edit mode button; key is its action's
+	hitWorktrees // the header saying which worktree is shown
 )
 
 type hit struct {
@@ -53,7 +54,16 @@ type hit struct {
 
 // hitTest maps screen coordinates to what is drawn there.
 func (m *Model) hitTest(x, y int) hit {
-	if m.status == nil || y >= m.bodyHeight() {
+	if m.status == nil {
+		return hit{}
+	}
+	if hh := m.headerHeight(); hh > 0 {
+		if y < hh {
+			return hit{kind: hitWorktrees}
+		}
+		y -= hh
+	}
+	if y >= m.bodyHeight() {
 		return hit{}
 	}
 	if m.resolving() {
@@ -216,6 +226,8 @@ func (m *Model) handleClick(msg tea.MouseClickMsg) tea.Cmd {
 	}
 
 	switch h.kind {
+	case hitWorktrees:
+		return m.worktreePicker(nil)
 	case hitDetailsClose:
 		m.det.full, m.det.focused = false, false
 		return nil

@@ -38,9 +38,12 @@ func testStatus() *but.Status {
 
 // fakeBut installs a `but` stand-in that logs its arguments and serves status.
 type fakeBut struct {
-	t    *testing.T
-	log  string
-	diff string // served for every `but diff`
+	t         *testing.T
+	log       string
+	dirs      string // the directory each logged command ran in
+	diff      string // served for every `but diff`
+	status    string // served for every `but status`
+	worktrees string // served for `but worktree list`
 }
 
 func newFakeBut(t *testing.T, s *but.Status) (*but.Client, *fakeBut) {
@@ -57,13 +60,15 @@ func newFakeButJSON(t *testing.T, status string) (*but.Client, *fakeBut) {
 	if err := os.WriteFile(statusFile, []byte(status), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	f := &fakeBut{t: t, log: filepath.Join(dir, "log"), diff: filepath.Join(dir, "diff.json")}
+	f := &fakeBut{t: t, log: filepath.Join(dir, "log"), dirs: filepath.Join(dir, "dirs"), diff: filepath.Join(dir, "diff.json"),
+		status: statusFile, worktrees: filepath.Join(dir, "worktrees.json")}
 	script := "#!/bin/sh\n" +
 		"case \"$1\" in\n" +
 		"  status) case \"$*\" in *--refresh-prs*) echo \"$*\" >> '" + f.log + "' ;; esac\n" +
 		"    cat '" + statusFile + "' ;;\n" +
 		"  diff) if [ -f '" + f.diff + "' ]; then cat '" + f.diff + "'; else echo '{\"changes\":[]}'; fi ;;\n" +
-		"  *) echo \"$*\" >> '" + f.log + "' ;;\n" +
+		"  worktree) if [ -f '" + f.worktrees + "' ]; then cat '" + f.worktrees + "'; else echo '{\"active\":[],\"archived\":[]}'; fi ;;\n" +
+		"  *) echo \"$*\" >> '" + f.log + "'; pwd >> '" + f.dirs + "' ;;\n" +
 		"esac\n"
 	bin := filepath.Join(dir, "but")
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
@@ -83,6 +88,27 @@ func (f *fakeBut) calls() []string {
 	}
 	return strings.Split(s, "\n")
 }
+
+// ranIn returns the directory each mutating command ran in, in order.
+func (f *fakeBut) ranIn() []string {
+	b, _ := os.ReadFile(f.dirs)
+	return strings.Fields(string(b))
+}
+
+// set makes the fake serve v, marshalled, from file: setStatus and setWorktrees.
+func (f *fakeBut) set(file string, v any) {
+	f.t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	if err := os.WriteFile(file, b, 0o644); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+func (f *fakeBut) setStatus(s *but.Status)          { f.set(f.status, s) }
+func (f *fakeBut) setWorktrees(l *but.WorktreeList) { f.set(f.worktrees, l) }
 
 // setDiff makes every `but diff` return d.
 func (f *fakeBut) setDiff(d *but.Diff) {

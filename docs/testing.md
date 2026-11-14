@@ -44,6 +44,7 @@ Commands that don't return quickly (the refresh tick, toast timers) are dropped 
 | unapplied | `old-experiment`, 1 commit |
 | uncommitted | `README.md` and `src/server.go` modified, `src/util/strings.go` added, `docs/old.md` deleted |
 | `Repo.Conflict()` | opt-in (`mkrepo -conflict`): adds `changelog` (a commit adding `CHANGELOG.md`) and pulls, which leaves that commit conflicted. It also sets the identity in the repository's git config, so resolving it works without `testrepo.Env`. The TUI's `TestE2EResolveInEditMode` uses it |
+| `Repo.Worktrees()` | opt-in (`mkrepo -worktrees`): two linked worktrees, `search` (1 commit, 1 uncommitted file, behind upstream) and `hotfix-login` (above `api`, 1 commit). `Repo.Worktree(name)` is its directory. The TUI's `TestE2EWorktreeSwitcher` uses it |
 
 `origin` is a local bare repository, so pushing works offline. `but` and git run with their own `HOME`, XDG dirs and a
 fixed identity (`testrepo.Env`), so your GitButler project list and settings are left alone. Commit dates are fixed,

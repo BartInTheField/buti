@@ -257,3 +257,45 @@ func TestIntegrationResolve(t *testing.T) {
 		t.Fatal("finishing left the commit conflicted")
 	}
 }
+
+// TestOpenWorktree finds the worktree buti starts in, from a directory inside it, and sees it in status.
+func TestOpenWorktree(t *testing.T) {
+	if os.Getenv("BUTI_INTEGRATION") == "" {
+		t.Skip("set BUTI_INTEGRATION=1 to run against the real but CLI")
+	}
+	if _, err := exec.LookPath("but"); err != nil {
+		t.Skip("but not on PATH")
+	}
+	r, err := testrepo.Create(testrepo.TempDir(t))
+	if err == nil {
+		r.Setenv(t.Setenv)
+		err = r.Worktrees()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	ws, wt, err := OpenWorktree(ctx, filepath.Join(r.Worktree("search"), "src"))
+	if err != nil || wt == nil {
+		t.Fatalf("OpenWorktree in search/src: %v, %v", wt, err)
+	}
+	if wt.Name != "search" || ws.Dir != r.Dir {
+		t.Fatalf("OpenWorktree in search/src = %q in %s, want search in %s", wt.Name, ws.Dir, r.Dir)
+	}
+	if ws, wt, err := OpenWorktree(ctx, filepath.Join(r.Dir, "src")); ws != nil || wt != nil || err != nil {
+		t.Fatalf("OpenWorktree in the workspace = %v, %v, %v; want nothing", ws, wt, err)
+	}
+
+	s, err := New(wt.Path).Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view := s.InWorktree("search")
+	if view == nil || len(view.Stacks) != 1 || len(view.Stacks[0].Branches[0].Commits) != 1 ||
+		len(view.UncommittedChanges) != 1 || view.UncommittedChanges[0].FilePath != "src/search_test.go" {
+		t.Fatalf("search as seen from its worktree: %+v", view)
+	}
+	if s.InWorktree("nope") != nil {
+		t.Fatal("InWorktree found a worktree that isn't there")
+	}
+}

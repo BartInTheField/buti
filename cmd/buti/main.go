@@ -101,7 +101,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if store, err := review.Open(abs); err == nil {
 		opts.Review = store
 	}
-	p := tea.NewProgram(ui.New(but.New(abs), opts))
+	client := but.New(abs)
+	// In a worktree, `but` reports the whole workspace: buti opens the worktree and runs the workspace's `but` too.
+	if ws, wt, err := but.OpenWorktree(context.Background(), abs); err == nil && wt != nil {
+		client, opts.Worktree = ws, wt
+	}
+	p := tea.NewProgram(ui.New(client, opts))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(stderr, "buti:", err)
 		return 1
