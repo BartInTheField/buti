@@ -8,7 +8,7 @@ buti runs in Zed's terminal like in any other, and a few integrations make it wo
 | [Open files at the line](#open-files-at-the-line) | `o` opens the file at the cursor's line, without leaving buti |
 | [Diffs in Zed](#diffs-in-zed) | `Z` (and `D` in Zed's terminal) opens the selected file, commit or branch in Zed's diff view |
 | [Comment from Zed](#comment-from-zed) | a task leaves a review comment on the line under Zed's cursor |
-| [Comments in Zed](#comments-in-zed) | the buti extension shows open review comments as diagnostics, with **Resolve** and **Dismiss** actions |
+| [Comments in Zed](#comments-in-zed) | the buti extension shows open review comments as diagnostics, and optionally as code lenses above their lines, with **Resolve** and **Dismiss** actions |
 
 `o`, `Z` and `D` work as soon as buti runs in Zed's terminal. Seeing and leaving comments in Zed takes a one-time
 [setup](#set-up).
@@ -55,6 +55,15 @@ buti runs in Zed's terminal like in any other, and a few integrations make it wo
    ```json
    "diagnostics": { "inline": { "enabled": true } }
    ```
+
+   or above its line, with **Resolve** and **Dismiss** to click (Zed 1.1.5 or later):
+
+   ```json
+   "code_lens": "on"
+   ```
+
+   This turns on the code lenses of every language server, not only buti's; **editor: toggle code lens** turns them
+   on and off without editing the settings.
 
 Then, in a GitButler repository: put the cursor on a changed line, press `cmd-alt-c`, type the comment and end it with
 an empty line. It shows up in buti, and in Zed as a diagnostic within a few seconds; `cmd-.` on it resolves or
@@ -138,6 +147,11 @@ comments on their change too, on the side they are on.
 
 A comment's text starts with 💬, which tells it apart from the compiler's diagnostics. Zed draws no diagnostics in its
 diff views, neither the underline nor the inline text, so there a comment shows on hover only.
+
+With `"code_lens": "on"` ([Set up](#set-up), step 5), each comment also gets a line above the line it is on:
+`💬 agent: [must-fix] handle errors · 1 reply | Resolve | Dismiss`. It shows the first line of the comment, cut at 60
+characters (the hover has the rest), and clicking **Resolve** or **Dismiss** closes it. Clicking the text moves the
+cursor to the commented line. Zed shows no code lenses in its diff views either.
 
 | Severity | Comment |
 |---|---|

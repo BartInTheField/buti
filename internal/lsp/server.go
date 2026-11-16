@@ -1,5 +1,5 @@
-// Package lsp is a language server that shows buti's review comments as diagnostics, so an editor marks the lines
-// a reviewer commented on, and resolves or dismisses them with code actions.
+// Package lsp is a language server that shows buti's review comments as diagnostics and code lenses, so an editor
+// marks the lines a reviewer commented on, and resolves or dismisses them with code actions or the lenses.
 //
 // It speaks JSON-RPC over stdio with hand-rolled framing. The comments are re-anchored on the current workspace with
 // `but`, then placed on the working copy of each file, which is what the editor shows.
@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf16"
 
@@ -24,11 +25,17 @@ import (
 	"github.com/bartinthefield/buti/internal/review"
 )
 
-// Commands the server executes, offered as code actions on its diagnostics.
+// Commands the server executes, offered as code actions on its diagnostics and as code lenses.
 const (
 	cmdResolve = "buti.resolve"
 	cmdDismiss = "buti.dismiss"
+	// cmdComment does nothing: it is the command of the code lens that shows the comment's text, which needs one
+	// to be shown. In Zed, clicking it moves the cursor to the line.
+	cmdComment = "buti.comment"
 )
+
+// lensWidth is how much of a comment's first line its code lens shows, so the lens fits above a line of code.
+const lensWidth = 60
 
 const source = "buti"
 
@@ -69,15 +76,18 @@ type Server struct {
 
 	kick chan struct{} // a refresh is wanted; buffered 1 so requests coalesce
 
-	mu        sync.Mutex
-	root      string
-	docs      map[string]string // open documents' text, by path
-	located   []review.Located  // the comments shown, from the last refresh
-	published map[string]string // the diagnostics last published per path, as JSON; absent when none
-	logged    map[string]bool   // errors already shown to the user
-	saveTimer *time.Timer
-	started   bool
-	shutdown  bool
+	requests atomic.Int64 // ids of the requests the server sends
+
+	mu          sync.Mutex
+	root        string
+	lensRefresh bool              // the client asks for code lenses again when told they changed
+	docs        map[string]string // open documents' text, by path
+	located     []review.Located  // the comments shown, from the last refresh
+	published   map[string]string // the diagnostics last published per path, as JSON; absent when none
+	logged      map[string]bool   // errors already shown to the user
+	saveTimer   *time.Timer
+	started     bool
+	shutdown    bool
 }
 
 // New returns a server for cfg.
@@ -140,13 +150,15 @@ func (s *Server) Run(ctx context.Context) error {
 			return nil
 		}
 		if m.Method == "" {
-			continue // a response; the server sends no requests that need one
+			continue // a response; the server's requests (a code lens refresh) need nothing from it
 		}
 		result, rerr := s.handle(ctx, &m)
 		if m.isRequest() {
 			s.reply(m.ID, result, rerr)
 		}
-		if m.Method == "workspace/executeCommand" && rerr == nil {
+		var cmd executeCommandParams
+		if m.Method == "workspace/executeCommand" && rerr == nil && json.Unmarshal(m.Params, &cmd) == nil &&
+			cmd.Command != cmdComment {
 			s.trigger() // after the reply, so the client hears the command succeeded first
 		}
 	}
@@ -171,7 +183,8 @@ func (s *Server) handle(ctx context.Context, m *message) (any, *rpcError) {
 			"capabilities": map[string]any{
 				"textDocumentSync":       map[string]any{"openClose": true, "change": 1, "save": true},
 				"codeActionProvider":     true,
-				"executeCommandProvider": map[string]any{"commands": []string{cmdResolve, cmdDismiss}},
+				"codeLensProvider":       map[string]any{"resolveProvider": false},
+				"executeCommandProvider": map[string]any{"commands": []string{cmdResolve, cmdDismiss, cmdComment}},
 			},
 			"serverInfo": map[string]any{"name": "buti"},
 		}, nil
@@ -212,6 +225,12 @@ func (s *Server) handle(ctx context.Context, m *message) (any, *rpcError) {
 			return nil, err
 		}
 		return codeActions(p), nil
+	case "textDocument/codeLens":
+		var p codeLensParams
+		if err := unmarshal(m.Params, &p); err != nil {
+			return nil, err
+		}
+		return s.codeLenses(uriToPath(p.TextDocument.URI)), nil
 	case "workspace/executeCommand":
 		var p executeCommandParams
 		if err := unmarshal(m.Params, &p); err != nil {
@@ -245,11 +264,12 @@ func (s *Server) initialize(p initializeParams) {
 	if root == "" && len(p.WorkspaceFolders) > 0 {
 		root = uriToPath(p.WorkspaceFolders[0].URI)
 	}
+	s.mu.Lock()
 	if root != "" {
-		s.mu.Lock()
 		s.root = root
-		s.mu.Unlock()
 	}
+	s.lensRefresh = p.Capabilities.Workspace.CodeLens.RefreshSupport
+	s.mu.Unlock()
 }
 
 // workspace opens the workspace on first use, and again after it failed.
@@ -386,12 +406,18 @@ func (s *Server) publishAll(dir string) {
 			stale = append(stale, p)
 		}
 	}
+	refresh := s.lensRefresh
 	s.mu.Unlock()
+	changed := false
 	for p, ls := range byPath {
-		s.publish(p, ls)
+		changed = s.publish(p, ls) || changed
 	}
 	for _, p := range stale {
-		s.publish(p, nil)
+		changed = s.publish(p, nil) || changed
+	}
+	// The lenses show the same comments as the diagnostics. After an edit the client asks for them again itself.
+	if changed && refresh {
+		s.request("workspace/codeLens/refresh")
 	}
 }
 
@@ -454,8 +480,8 @@ func (s *Server) onCopy(path string) ([]review.Located, bool) {
 }
 
 // publish sends the diagnostics of the comments ls on the file at path, placed on its open text or its text on
-// disk. A file that is gone gets none.
-func (s *Server) publish(path string, ls []review.Located) {
+// disk, and reports whether they changed. A file that is gone gets none.
+func (s *Server) publish(path string, ls []review.Located) bool {
 	diags := []diagnostic{}
 	if len(ls) > 0 {
 		if lines, ok := s.lines(path); ok {
@@ -475,9 +501,39 @@ func (s *Server) publish(path string, ls []review.Located) {
 	}
 	s.mu.Unlock()
 	if len(diags) == 0 && !had || had && last == string(data) {
-		return
+		return false
 	}
 	s.notify("textDocument/publishDiagnostics", publishDiagnosticsParams{URI: pathToURI(path), Diagnostics: diags})
+	return true
+}
+
+// codeLenses puts a line above each comment on the file at path: its text, then Resolve and Dismiss.
+func (s *Server) codeLenses(path string) []codeLens {
+	lenses := []codeLens{}
+	s.wsMu.Lock()
+	ws := s.ws
+	s.wsMu.Unlock()
+	if ws == nil || path == "" {
+		return lenses
+	}
+	s.mu.Lock()
+	ls := s.commentsOn(path, ws.Dir)
+	s.mu.Unlock()
+	lines, ok := s.lines(path)
+	if !ok {
+		return lenses
+	}
+	for _, l := range ls {
+		start, _, _ := review.WorktreeLines(l, lines)
+		at := lspRange{Start: position{Line: start - 1}, End: position{Line: start - 1}}
+		id := []any{l.Comment.ID}
+		lenses = append(lenses,
+			codeLens{Range: at, Command: command{Title: lensTitle(l), Command: cmdComment, Arguments: id}},
+			codeLens{Range: at, Command: command{Title: "Resolve", Command: cmdResolve, Arguments: id}},
+			codeLens{Range: at, Command: command{Title: "Dismiss", Command: cmdDismiss, Arguments: id}},
+		)
+	}
+	return lenses
 }
 
 // lines returns the text of the file at path, from the editor when it is open, split into lines without EOLs.
@@ -551,20 +607,47 @@ func toDiagnostic(l review.Located, lines []string) diagnostic {
 
 // diagnosticMessage is the comment's body with its replies, one per line.
 func diagnosticMessage(l review.Located) string {
-	c := l.Comment
 	var b strings.Builder
-	b.WriteString("💬 ") // tells a review comment apart from the compiler's and linters' diagnostics
-	if l.Status == review.StatusOutdated {
-		b.WriteString("(outdated) ")
-	}
-	if c.Author != "" && c.Author != review.AuthorUser {
-		b.WriteString(c.Author + ": ")
-	}
-	b.WriteString(c.Body)
-	for _, r := range c.Replies {
+	b.WriteString(heading(l))
+	b.WriteString(l.Comment.Body)
+	for _, r := range l.Comment.Replies {
 		fmt.Fprintf(&b, "\n↳ %s: %s", r.Author, r.Body)
 	}
 	return b.String()
+}
+
+// lensTitle is the comment's first line, cut to lensWidth, and how many replies it has; the diagnostic's hover has
+// the rest.
+func lensTitle(l review.Located) string {
+	body, _, more := strings.Cut(strings.TrimSpace(l.Comment.Body), "\n")
+	body = strings.TrimSpace(body)
+	if r := []rune(body); len(r) > lensWidth {
+		body, more = strings.TrimSpace(string(r[:lensWidth-1])), true
+	}
+	if more {
+		body += "…"
+	}
+	switch n := len(l.Comment.Replies); n {
+	case 0:
+	case 1:
+		body += " · 1 reply"
+	default:
+		body += fmt.Sprintf(" · %d replies", n)
+	}
+	return heading(l) + body
+}
+
+// heading starts a comment's text: 💬, which tells a review comment apart from the compiler's and linters'
+// diagnostics, then whether it is outdated and who wrote it.
+func heading(l review.Located) string {
+	h := "💬 "
+	if l.Status == review.StatusOutdated {
+		h += "(outdated) "
+	}
+	if a := l.Comment.Author; a != "" && a != review.AuthorUser {
+		h += a + ": "
+	}
+	return h
 }
 
 func utf16Len(s string) int {
@@ -595,6 +678,9 @@ func codeActions(p codeActionParams) []codeAction {
 
 // execute resolves or dismisses a comment. Run refreshes afterwards, so its diagnostic goes away.
 func (s *Server) execute(p executeCommandParams) *rpcError {
+	if p.Command == cmdComment {
+		return nil
+	}
 	if p.Command != cmdResolve && p.Command != cmdDismiss {
 		return &rpcError{Code: codeInvalidParams, Message: "unknown command " + p.Command}
 	}
@@ -634,6 +720,11 @@ func (s *Server) logError(err error) {
 
 func (s *Server) notify(method string, params any) {
 	s.send(map[string]any{"jsonrpc": "2.0", "method": method, "params": params})
+}
+
+// request sends a request without params; Run drops the response.
+func (s *Server) request(method string) {
+	s.send(map[string]any{"jsonrpc": "2.0", "id": s.requests.Add(1), "method": method})
 }
 
 func (s *Server) reply(id json.RawMessage, result any, rerr *rpcError) {

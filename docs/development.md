@@ -51,7 +51,7 @@ fresh test repository:
 - `internal/reviewcli`: the `buti review` commands for coding agents, and the flat JSON they print
 - `internal/update`: finding the latest release and replacing the running binary
 - `internal/editor`: the user's editor (`o`), and the old and new copies for a diff in Zed (`Z`)
-- `internal/lsp`: `buti lsp`, the language server that shows review comments as diagnostics
+- `internal/lsp`: `buti lsp`, the language server that shows review comments as diagnostics and code lenses
 - `editors/zed`: the Zed extension that starts `buti lsp` (Rust, built to wasm); see [Zed](zed.md)
 - `internal/testrepo`: the test repository (see [Testing](testing.md))
 - `skills`: the agent skills (`buti-resolve/SKILL.md`, `buti-review/SKILL.md`), embedded in the binary for `buti skill install`
