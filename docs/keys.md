@@ -17,6 +17,8 @@
 | `P` / `N` | push the branch / open a pull request |
 | `a` / `S` | apply a branch (picker) / unapply the stack |
 | `L` | pull upstream changes |
+| `w` | new worktree: on top of the selected workspace branch, or at the workspace base |
+| `o` / `S` / `x` | on a worktree's card: open a shell in it / archive it / remove it, after confirming |
 | `u` / `U` / `H` | undo / redo / operation history (restore any snapshot) |
 | `space` | mark (on **Unstaged**, marks every file) |
 | `f` / `F` | files in the commit / in every commit |

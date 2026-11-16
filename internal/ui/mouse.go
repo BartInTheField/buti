@@ -101,6 +101,10 @@ func (m *Model) hitTest(x, y int) hit {
 		return hit{}
 	}
 
+	top := m.captionHeight()
+	if y < top {
+		return hit{} // on the captions
+	}
 	lw, visible := m.laneLayout()
 	rel := x - sw - 1
 	col := rel / (lw + 1)
@@ -113,7 +117,7 @@ func (m *Model) hitTest(x, y int) hit {
 	}
 	l := m.lanes[li]
 	lv := l.render(lw, m.laneSel(li), m.deco)
-	line := scrollOffset(len(lv.lines), lv.selLine, lanesH) + y
+	line := scrollOffset(len(lv.lines), lv.selLine, lanesH-top) + y - top
 	if line >= len(lv.items) {
 		return hit{}
 	}
@@ -296,6 +300,13 @@ func (m *Model) startCommitInLane(li int) tea.Cmd {
 		return nil
 	}
 	top := l.stack.Branches[0].Name
+	if l.wt != nil {
+		ids := m.worktreeChanges(l.wt.Name)
+		if len(ids) == 0 {
+			return m.notify(toastInfo, "Nothing to commit in worktree "+l.wt.Name)
+		}
+		return m.startCommit(ids, placementBranch(l.stack.Branches[0].CliID), false, "Commit "+pluralize(len(ids), "change")+" in worktree "+l.wt.Name+" to branch "+top)
+	}
 	var ids []string
 	what := "all changes"
 	for _, c := range l.stack.AssignedChanges {
@@ -338,7 +349,7 @@ func (m *Model) computeDragTarget() (*targetMode, entity) {
 	if !ok {
 		return nil, h.ent
 	}
-	srcs, why := sourcesFor(v, m.drag.sources)
+	srcs, why := sourcesFor(v, m.drag.sources, m.status)
 	if why != "" {
 		return nil, h.ent
 	}

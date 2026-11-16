@@ -81,10 +81,30 @@ type UpstreamState struct {
 type Status struct {
 	UncommittedChanges []Change      `json:"uncommittedChanges"`
 	Stacks             []Stack       `json:"stacks"`
+	Worktrees          []Worktree    `json:"worktrees"`
 	MergeBase          Commit        `json:"mergeBase"`
 	UpstreamState      UpstreamState `json:"upstreamState"`
 
 	Resolving *Resolution `json:"-"` // set in edit mode, when the rest is empty
+}
+
+// Branch finds a branch by name, in the workspace or in a worktree.
+func (s *Status) Branch(name string) *Branch {
+	for i := range s.Stacks {
+		for j := range s.Stacks[i].Branches {
+			if s.Stacks[i].Branches[j].Name == name {
+				return &s.Stacks[i].Branches[j]
+			}
+		}
+	}
+	for i := range s.Worktrees {
+		for j := range s.Worktrees[i].Branches {
+			if s.Worktrees[i].Branches[j].Name == name {
+				return &s.Worktrees[i].Branches[j]
+			}
+		}
+	}
+	return nil
 }
 
 // Client runs `but` commands in a repository directory.
@@ -162,7 +182,17 @@ func (c *Client) status(ctx context.Context, args ...string) (*Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decode but status: %w", err)
 	}
+	if len(s.Worktrees) > 0 {
+		c.worktreePaths(ctx, s.Worktrees)
+	}
 	return s, nil
+}
+
+// In is the client for another checkout of the same project, such as a worktree.
+func (c *Client) In(dir string) *Client {
+	cp := *c
+	cp.Dir = dir
+	return &cp
 }
 
 type Hunk struct {

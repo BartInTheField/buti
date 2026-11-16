@@ -56,16 +56,19 @@ type plan struct {
 }
 
 // sourcesFor turns the subjects into sources for a verb, or explains why not.
-func sourcesFor(v verb, subjects []entity) ([]entity, string) {
+func sourcesFor(v verb, subjects []entity, s *but.Status) ([]entity, string) {
 	if len(subjects) == 0 {
 		return nil, "nothing selected"
 	}
 	switch v {
 	case verbCommit:
-		if allOf(subjects, entArea, entDir, entFile, entHunk) {
+		if allOf(subjects, entArea, entDir, entFile, entHunk, entWorktree) {
 			return subjects, ""
 		}
-		// On a branch or commit, commit everything uncommitted (like `but tui`).
+		// On a branch or commit, commit everything uncommitted (like `but tui`): in its worktree, when it has one.
+		if wt := subjects[0].worktree; wt != "" && s != nil && s.Worktree(wt) != nil {
+			return []entity{worktreeEntity(s.Worktree(wt))}, ""
+		}
 		return []entity{{kind: entArea, id: "@", label: "all changes"}}, ""
 	case verbSquash:
 		if allOf(subjects, entArea, entDir, entFile, entHunk) || allOf(subjects, entCommit) ||
@@ -133,8 +136,15 @@ func (t *targetMode) plan(target entity) (p plan, ok bool) {
 		return plan{}, false
 	}
 	src := t.sources[0]
+	// A worktree's changes and commits stay in it, and the workspace's stay out of worktrees.
+	if src.worktree != target.worktree {
+		return plan{}, false
+	}
 	what := describeAll(t.sources)
 	ids := t.sourceIDs()
+	if src.kind == entWorktree && len(ids) == 0 {
+		return plan{}, false // no ids would commit the workspace's changes
+	}
 	hasCommits := func(e entity) bool { return e.kind == entBranch && len(t.branchCommits(e)) > 0 }
 
 	switch t.verb {
@@ -142,7 +152,7 @@ func (t *targetMode) plan(target entity) (p plan, ok bool) {
 		var at but.Placement
 		switch target.kind {
 		case entBranch:
-			at, p.label, p.desc = but.Placement{Branch: target.branch}, "commit here", "Commit "+what+" to "+target.describe()
+			at, p.label, p.desc = but.Placement{Branch: target.branchRef()}, "commit here", "Commit "+what+" to "+target.describe()
 		case entCommit:
 			at, p.insert = placeRelative(t.side, target.id), t.side
 			p.label, p.desc = "commit "+t.sideWord(), "Commit "+what+" "+t.sideWord()+" "+target.describe()
@@ -169,10 +179,14 @@ func (t *targetMode) plan(target entity) (p plan, ok bool) {
 			}
 			return p, true
 
-		case target.kind == entArea:
+		case target.kind == entArea || target.kind == entWorktree:
 			p.label, p.desc = "uncommit", "Uncommit "+what
 			p.run = func(m *Model) tea.Cmd {
-				return m.runOp(p.desc, selectArea, func(ctx context.Context, c *but.Client) error {
+				intent := selectArea
+				if target.kind == entWorktree {
+					intent, m.pendingKey = keepSelection, target.key() // the changes land in the worktree
+				}
+				return m.runOp(p.desc, intent, func(ctx context.Context, c *but.Client) error {
 					return c.Uncommit(ctx, ids)
 				})
 			}
@@ -205,9 +219,9 @@ func (t *targetMode) plan(target entity) (p plan, ok bool) {
 			at, p.insert = placeRelative(t.side, target.id), t.side
 			p.label, p.desc = "move "+t.sideWord(), "Move "+what+" "+t.sideWord()+" "+target.describe()
 		case src.kind == entCommit && target.kind == entBranch:
-			at, p.label, p.desc = but.Placement{Branch: target.branch}, "move here", "Move "+what+" to "+target.describe()
+			at, p.label, p.desc = but.Placement{Branch: target.branchRef()}, "move here", "Move "+what+" to "+target.describe()
 		case src.kind == entBranch && target.kind == entBranch:
-			at, p.label, p.desc = but.Placement{Branch: target.branch}, "stack onto", "Stack "+what+" onto "+target.describe()
+			at, p.label, p.desc = but.Placement{Branch: target.branchRef()}, "stack onto", "Stack "+what+" onto "+target.describe()
 		case target.kind == entNewBranch:
 			at, p.label = but.Placement{NewBranch: true}, "new branch"
 			p.desc = "Move " + what + " to a new branch"
@@ -230,7 +244,7 @@ func (t *targetMode) plan(target entity) (p plan, ok bool) {
 		var at but.Placement
 		switch target.kind {
 		case entBranch:
-			at, p.label, p.desc = but.Placement{Branch: target.branch}, "pick here", "Cherry-pick "+what+" to "+target.describe()
+			at, p.label, p.desc = but.Placement{Branch: target.branchRef()}, "pick here", "Cherry-pick "+what+" to "+target.describe()
 		case entCommit:
 			at, p.insert = placeRelative(t.side, target.id), t.side
 			p.label, p.desc = "pick "+t.sideWord(), "Cherry-pick "+what+" "+t.sideWord()+" "+target.describe()
@@ -276,12 +290,8 @@ func (t *targetMode) branchCommits(e entity) []but.Commit {
 	if e.kind != entBranch || t.status == nil {
 		return nil
 	}
-	for _, st := range t.status.Stacks {
-		for _, b := range st.Branches {
-			if b.Name == e.branch {
-				return b.Commits
-			}
-		}
+	if b := t.status.Branch(e.branch); b != nil {
+		return b.Commits
 	}
 	return nil
 }
@@ -350,7 +360,7 @@ func dropVerb(source, target entity) (verb, bool) {
 		}
 	case source.kind == entCommit:
 		switch target.kind {
-		case entCommit, entArea:
+		case entCommit, entArea, entWorktree:
 			return verbSquash, true
 		case entBranch, entNewBranch:
 			return verbMove, true

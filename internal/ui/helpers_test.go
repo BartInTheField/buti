@@ -63,6 +63,7 @@ func newFakeButJSON(t *testing.T, status string) (*but.Client, *fakeBut) {
 		"  status) case \"$*\" in *--refresh-prs*) echo \"$*\" >> '" + f.log + "' ;; esac\n" +
 		"    cat '" + statusFile + "' ;;\n" +
 		"  diff) if [ -f '" + f.diff + "' ]; then cat '" + f.diff + "'; else echo '{\"changes\":[]}'; fi ;;\n" +
+		"  worktree) if [ \"$2\" = list ]; then echo '{\"active\":[],\"archived\":[]}'; else echo \"$*\" >> '" + f.log + "'; fi ;;\n" +
 		"  *) echo \"$*\" >> '" + f.log + "' ;;\n" +
 		"esac\n"
 	bin := filepath.Join(dir, "but")

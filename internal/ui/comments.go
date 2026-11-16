@@ -134,7 +134,7 @@ func (m *Model) openComments(e entity) int {
 		a := l.Anchor
 		switch e.kind {
 		case entFile:
-			if a.Kind != review.KindCommit && a.Path == e.label {
+			if a.Kind != review.KindCommit && a.Path == e.label && e.worktree == "" {
 				n++
 			}
 		case entCommit:
@@ -169,9 +169,11 @@ func withCount(tag string, n int) string {
 func hasReview(m *Model, _ []entity) bool { return m.review != nil }
 
 // canComment reports whether C can open the composer: a line cursor in the details pane, not on a comment.
+// canComment reports whether the line cursor can take a comment. Comments are located on the workspace's stacks
+// only, so a comment in a worktree would be orphaned at once.
 func canComment(m *Model, sel []entity) bool {
 	_, onNote := m.det.cursorNote()
-	return m.review != nil && detailsLines(m, sel) && !onNote
+	return m.review != nil && detailsLines(m, sel) && !onNote && m.det.ent.worktree == ""
 }
 
 func onComment(m *Model, _ []entity) bool {

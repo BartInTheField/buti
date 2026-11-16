@@ -591,3 +591,69 @@ func TestE2EZedDiff(t *testing.T) {
 		t.Errorf("old side equals the worktree file %q", newB)
 	}
 }
+
+// TestE2EWorktrees shows linked worktrees as lanes beside the workspace's stacks and works on them from the main
+// checkout: commits to a worktree branch once a branch is stacked on it (where `but` finds its name ambiguous), pushes
+// it, and drops a worktree whose directory was deleted.
+func TestE2EWorktrees(t *testing.T) {
+	h, r := newRepoHarness(t)
+	dirs, err := r.Worktrees()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.send(tea.WindowSizeMsg{Width: 240, Height: 46})
+	h.run(h.m.fetchStatus())
+	h.wantOnScreen("Workspace", "Worktrees", "search", "billing", "on api", "↓1 behind",
+		"Add a search index", "Add the invoice", "query.go")
+	h.snap("lanes")
+
+	h.selectText("query.go")
+	h.keys("d")
+	h.wantOnScreen("func Query")
+	h.snap("diff")
+	h.keys("d")
+
+	// Stack ranking on search inside the worktree.
+	h.hover("worktree:search")
+	h.keys("b")
+	h.typeText("ranking")
+	h.keys("enter")
+	wt := h.status().Worktree("search")
+	if wt == nil || len(wt.Branches) != 2 || wt.Branches[0].Name != "ranking" {
+		t.Fatalf("search worktree after b: %+v", wt)
+	}
+
+	// Commit query.go to search, the bottom branch, whose name `but` now finds ambiguous.
+	h.selectText("query.go")
+	h.keys("c")
+	h.hover("branch:auth")
+	h.wantOnScreen("choose a target") // a workspace branch can't take a worktree's change
+	h.hover("branch:search")
+	h.wantOnScreen("commit here")
+	h.snap("commit-target")
+	h.keys("enter")
+	h.typeText("Add search queries")
+	h.keys("enter")
+	wt = h.status().Worktree("search")
+	if wt == nil || len(wt.Branches) != 2 || len(wt.Branches[1].Commits) != 2 || wt.Branches[1].Commits[0].Subject() != "Add search queries" {
+		t.Fatalf("search worktree after the commit: %+v", wt)
+	}
+	h.wantOnScreen("Add search queries", "ranking")
+	h.snap("committed")
+
+	h.hover("branch:search")
+	h.keys("P")
+	if b := h.status().Branch("search"); b == nil || b.BranchStatus != "nothingToPush" {
+		t.Fatalf("search after push: %+v", b)
+	}
+
+	// A worktree whose directory is deleted drops out of the view on the next reload.
+	if err := os.RemoveAll(dirs["billing"]); err != nil {
+		t.Fatal(err)
+	}
+	h.run(h.m.fetchStatus())
+	if strings.Contains(h.screen(), "billing") {
+		t.Fatalf("billing still shown after its directory was deleted:\n%s", h.screen())
+	}
+	h.wantOnScreen("search", "Workspace")
+}

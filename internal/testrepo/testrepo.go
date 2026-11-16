@@ -237,6 +237,38 @@ func (r *Repo) Conflict() error {
 	return b.err
 }
 
+// Worktrees adds two linked worktrees next to the workspace, under HOME/.gitbutler-worktrees/repo:
+//
+//	search    at the workspace base, 1 commit, src/search/index.go modified and src/search/query.go added
+//	billing   on top of api, 1 commit, clean
+//
+// It returns their directories by name.
+func (r *Repo) Worktrees() (map[string]string, error) {
+	b := &builder{r: r}
+	dirs := map[string]string{}
+	root := filepath.Join(r.Home, ".gitbutler-worktrees", filepath.Base(r.Dir))
+	for _, wt := range []struct{ name, above, file, content, msg string }{
+		{"search", "", "src/search/index.go", "package search\n\nfunc Index(docs []string) map[string]int {\n\treturn nil\n}\n", "Add a search index"},
+		{"billing", "api", "src/billing/invoice.go", "package billing\n\ntype Invoice struct{ Cents int }\n", "Add the invoice model"},
+	} {
+		args := []string{"but", "worktree", "new"}
+		if wt.above != "" {
+			args = append(args, "--above", wt.above)
+		}
+		b.run(append(args, wt.name)...)
+		dir := filepath.Join(root, wt.name)
+		dirs[wt.name] = dir
+		wb := &builder{r: &Repo{Dir: dir, Home: r.Home, Env: r.Env}, err: b.err, tick: b.tick}
+		wb.write(wt.file, wt.content)
+		wb.commit(wt.name, wt.msg, wt.file)
+		b.err, b.tick = wb.err, wb.tick
+	}
+	wb := &builder{r: &Repo{Dir: dirs["search"], Home: r.Home, Env: r.Env}, err: b.err}
+	wb.write("src/search/index.go", "package search\n\n// Index maps each word to how often it occurs.\nfunc Index(docs []string) map[string]int {\n\treturn map[string]int{}\n}\n")
+	wb.write("src/search/query.go", "package search\n\nfunc Query(q string) []string { return nil }\n")
+	return dirs, wb.err
+}
+
 const serverGo = `package demo
 
 import "net/http"
