@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -81,5 +82,21 @@ func TestUncommitInWorktree(t *testing.T) {
 	h.but.expect("uncommit c9")
 	if got := h.selectedKey(); got != "worktree:search" {
 		t.Fatalf("selected %q after uncommitting, want the worktree", got)
+	}
+}
+
+// Only the divider where the worktrees start is drawn in the worktree colour: without worktrees there is none.
+func TestWorktreeDividerOnlyWithWorktrees(t *testing.T) {
+	blue := "38;2;56;189;248" // colorWorktree, #38BDF8
+	h := newHarness(t)
+	if strings.Contains(h.m.View().Content, blue) {
+		t.Fatalf("worktree colour on screen without worktrees:\n%s", h.screen())
+	}
+	h = newHarnessWith(t, worktreeStatus())
+	h.send(tea.WindowSizeMsg{Width: 220, Height: 36})
+	// Worktree cards have blue borders too, but only the divider reaches the bottom lane row.
+	lines := strings.Split(h.m.View().Content, "\n")
+	if bottom := lines[len(lines)-2]; !strings.Contains(bottom, blue+"m│") {
+		t.Fatalf("no worktree divider on the bottom lane row:\n%s", h.screen())
 	}
 }
