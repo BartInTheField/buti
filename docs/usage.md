@@ -34,6 +34,14 @@ runs the [review commands](#review-comments-for-coding-agents) and `buti skill` 
   `tab` (or `h`) moves into it, `j`/`k` (or a click) jump the diff to a file, `enter` folds a folder or goes back
   to the diff, and `T` hides the tree. `+` / `-` resize it, as does dragging the divider. It is left out on screens
   narrower than 90 columns.
+- **Worktrees** (right of the lanes, under **⌂ Worktrees**): one lane per linked worktree (`but worktree new`, or
+  `w`). A worktree holds one stack, so its lane is like a stack's, with a card on top instead of the commit box: the
+  worktree's name, where it starts (`on api`, or `↓1 behind` the target), its directory and its uncommitted changes.
+  Commit, amend, squash, move, reword, push and `b` (a branch stacked on top) work as in the workspace, but a
+  worktree's changes and commits only go to its own branches. On the card, `o` opens a shell in the worktree, `S`
+  archives it and `x` removes it. When the worktrees are past the right edge, `⌂ 2 worktrees →` says so. A worktree
+  whose directory was deleted drops out, as `but` stops reporting it. Started inside a worktree, buti opens its
+  workspace and selects that worktree. Absorb and review comments don't work in worktrees yet.
 - **Status bar**: the mode, the keys that apply now, and how far the workspace is behind upstream.
 
 buti reloads every 3 seconds. A branch's pull request and its checks come from GitButler's cache, which the reload

@@ -37,6 +37,7 @@ type Options struct {
 	Target      string        // CLI id or branch name to select on start
 	ShowDetails bool          // open the details pane on start
 	StateFile   string        // when set, the selection is saved here on quit and restored on start
+	Worktree    string        // the linked worktree buti was started in, to select on start
 	Version     string        // running version; only a release (see update.IsRelease) can update itself
 	UpdateCheck bool          // offer a newer release on start
 	UpdateCache string        // where the latest release version is cached between runs
@@ -330,9 +331,8 @@ func (m *Model) rebuild() {
 		m.editing = nil // edit mode is over, or entering it failed
 	}
 	m.files = buildFileRows(m.status.UncommittedChanges, m.collapsed)
-	m.lanes = append(buildLanes(m.status, func(c *but.Commit) bool {
-		return m.showAllFiles || m.showFiles[commitKey(c)]
-	}), phantomLane())
+	showFiles := func(c *but.Commit) bool { return m.showAllFiles || m.showFiles[commitKey(c)] }
+	m.lanes = append(append(buildLanes(m.status, showFiles), phantomLane()), worktreeLanes(m.status, showFiles)...)
 	m.selectKey(prev)
 }
 
@@ -349,6 +349,14 @@ func (m *Model) restoreInitialSelection() {
 		for i, r := range m.files {
 			if r.change.CliID == t || r.path == t {
 				m.focus, m.fileCursor = focusFiles, i
+				return
+			}
+		}
+	}
+	if w := m.opts.Worktree; w != "" {
+		for li, l := range m.lanes {
+			if l.wt != nil && but.SamePath(l.wt.Path, w) {
+				m.focus, m.lane, m.laneCursor = focusLanes, li, 0
 				return
 			}
 		}
@@ -575,7 +583,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		case entDir:
 			m.toggleDir()
 			return nil
-		case entArea, entFile, entCommittedFile:
+		case entArea, entFile, entCommittedFile, entWorktree:
 			return m.setDetailsFull(true)
 		case entConflict:
 			return m.openInEditor(e.label, 0, m.pathOf(e))
@@ -744,7 +752,7 @@ func (m *Model) handleTargetKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.notify(toastInfo, "Select a branch to put the new branch on")
 	case "c", "r", "m", "p":
 		v := map[string]verb{"c": verbCommit, "r": verbSquash, "m": verbMove, "p": verbPick}[key]
-		if srcs, why := sourcesFor(v, t.sources); why == "" {
+		if srcs, why := sourcesFor(v, t.sources, m.status); why == "" {
 			t.verb, t.sources = v, srcs
 		} else {
 			return m.notify(toastInfo, why)
@@ -1072,15 +1080,26 @@ func (m *Model) lanesView() string {
 		return mutedStyle.Render(" loading workspace…")
 	}
 	lw, visible := m.laneLayout()
-	div := dividerStyle.Render(strings.TrimSuffix(strings.Repeat("│\n", lanesH), "\n"))
+	top := m.captionHeight()
+	h := lanesH - top
+	f := m.firstWorktreeLane()
 	var cols []string
 	for i := m.laneOffset; i < min(m.laneOffset+visible, len(m.lanes)); i++ {
 		lv := m.lanes[i].render(lw, m.laneSel(i), m.deco)
-		off := scrollOffset(len(lv.lines), lv.selLine, lanesH)
-		visibleLines := lv.lines[off:min(off+lanesH, len(lv.lines))]
-		cols = append(cols, lipgloss.NewStyle().Width(lw).Height(lanesH).Render(strings.Join(visibleLines, "\n")), div)
+		off := scrollOffset(len(lv.lines), lv.selLine, h)
+		visibleLines := lv.lines[off:min(off+h, len(lv.lines))]
+		div := dividerStyle
+		if i == f-1 {
+			div = lipgloss.NewStyle().Foreground(colorWorktree) // where the worktrees start
+		}
+		cols = append(cols, lipgloss.NewStyle().Width(lw).Height(h).Render(strings.Join(visibleLines, "\n")),
+			div.Render(strings.TrimSuffix(strings.Repeat("│\n", h), "\n")))
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, cols...)
+	lanes := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
+	if top == 0 {
+		return lanes
+	}
+	return m.captions() + "\n" + lanes
 }
 
 func (m *Model) sidebarView(width, height int) string {

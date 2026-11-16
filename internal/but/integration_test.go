@@ -257,3 +257,38 @@ func TestIntegrationResolve(t *testing.T) {
 		t.Fatal("finishing left the commit conflicted")
 	}
 }
+
+// TestIntegrationWorktrees reads the worktrees with their directories, and finds the workspace from inside one.
+func TestIntegrationWorktrees(t *testing.T) {
+	if os.Getenv("BUTI_INTEGRATION") == "" {
+		t.Skip("set BUTI_INTEGRATION=1 to run against the real but CLI")
+	}
+	if _, err := exec.LookPath("but"); err != nil {
+		t.Skip("but not on PATH")
+	}
+	r, err := testrepo.Create(testrepo.TempDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Setenv(t.Setenv)
+	dirs, err := r.Worktrees()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(r.Dir).Status(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt := s.Worktree("search")
+	if wt == nil || !SamePath(wt.Path, dirs["search"]) || len(wt.UncommittedChanges) != 2 || s.Branch("search") == nil {
+		t.Fatalf("search worktree: %+v", wt)
+	}
+
+	top, main, ok := LinkedWorktree(filepath.Join(dirs["search"], "src", "search"))
+	if !ok || !SamePath(top, dirs["search"]) || !SamePath(main, r.Dir) {
+		t.Fatalf("LinkedWorktree in search/src/search = %q, %q, %v; want %s, %s", top, main, ok, dirs["search"], r.Dir)
+	}
+	if _, _, ok := LinkedWorktree(filepath.Join(r.Dir, "src")); ok {
+		t.Fatal("LinkedWorktree found a worktree in the workspace")
+	}
+}

@@ -122,7 +122,7 @@ func firstChange(hunk string) int {
 }
 
 // zedDiffable is what `Z` can open in Zed.
-var zedDiffable = one(entFile, entHunk, entArea, entCommittedFile, entCommit, entBranch)
+var zedDiffable = one(entFile, entHunk, entArea, entCommittedFile, entCommit, entBranch, entWorktree)
 
 // fullDetails is `D`: full-screen details, except in Zed's terminal, where Zed's own diff view is a better full
 // screen. With nothing to diff, or to leave full screen, it still toggles.
@@ -149,14 +149,13 @@ func (m *Model) receiveZedDiff(msg zedDiffMsg) tea.Cmd {
 // zedDiff is `Z`: it writes the old and new side of the entity's files and starts Zed on them, off the UI thread.
 func (m *Model) zedDiff(e entity) tea.Cmd {
 	client := m.client
+	if e.dir != "" && e.kind.uncommitted() {
+		client = client.In(e.dir) // a worktree's changes: `but diff` there, and its files
+	}
 	var tip string // the commit a branch's new side is read at
 	if e.kind == entBranch {
-		for _, st := range m.status.Stacks {
-			for _, b := range st.Branches {
-				if b.Name == e.branch && len(b.Commits) > 0 {
-					tip = b.Commits[0].CommitID // newest first, as `but status` lists them
-				}
-			}
+		if b := m.status.Branch(e.branch); b != nil && len(b.Commits) > 0 {
+			tip = b.Commits[0].CommitID // newest first, as `but status` lists them
 		}
 		if tip == "" {
 			return m.notify(toastError, e.branch+" has no commits to diff")
@@ -176,7 +175,7 @@ func runZedDiff(ctx context.Context, c *but.Client, e entity, tip string) error 
 	}
 	var args []string
 	switch e.kind {
-	case entFile, entHunk, entArea:
+	case entFile, entHunk, entArea, entWorktree:
 		d, err := c.Diff(ctx, "")
 		if err != nil {
 			return err

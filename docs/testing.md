@@ -43,6 +43,7 @@ Commands that don't return quickly (the refresh tick, toast timers) are dropped 
 | stack 3 | `empty`: no commits |
 | unapplied | `old-experiment`, 1 commit |
 | uncommitted | `README.md` and `src/server.go` modified, `src/util/strings.go` added, `docs/old.md` deleted |
+| `Repo.Worktrees()` | opt-in (`mkrepo -worktrees`): two linked worktrees under `HOME/.gitbutler-worktrees/repo`: `search` at the base (1 commit, `src/search/index.go` modified and `src/search/query.go` added, 1 behind) and `billing` on top of `api` (1 commit). `TestE2EWorktrees` uses it |
 | `Repo.Conflict()` | opt-in (`mkrepo -conflict`): adds `changelog` (a commit adding `CHANGELOG.md`) and pulls, which leaves that commit conflicted. It also sets the identity in the repository's git config, so resolving it works without `testrepo.Env`. The TUI's `TestE2EResolveInEditMode` uses it |
 
 `origin` is a local bare repository, so pushing works offline. `but` and git run with their own `HOME`, XDG dirs and a
@@ -56,6 +57,7 @@ To look at it yourself:
 ```sh
 mise run fixture   # prints the command to run buti against it
 go run ./internal/testrepo/mkrepo -conflict "$(mktemp -d)"   # with the conflicted commit
+go run ./internal/testrepo/mkrepo -worktrees "$(mktemp -d)"  # with two linked worktrees
 ```
 
 `but` 0.23 has no command to assign a change to a stack, so the fixture has no assigned changes.

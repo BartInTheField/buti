@@ -89,6 +89,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	opts := ui.Options{Target: fs.Arg(0), ShowDetails: *diff, Version: version}
+	// In a linked worktree `but status` still reports the whole workspace, but `but diff` and file paths would be the
+	// worktree's: buti runs in the workspace and starts on the worktree's lane.
+	if top, workspace, ok := but.LinkedWorktree(abs); ok {
+		abs, opts.Worktree = workspace, top
+	}
 	// Builds without a release version (go run, go install) have nothing to update to.
 	if version != "dev" {
 		opts.UpdateCheck = os.Getenv("BUTI_NO_UPDATE_CHECK") == ""

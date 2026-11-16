@@ -65,11 +65,21 @@ func detailsLines(m *Model, _ []entity) bool {
 
 func verbAvailable(v verb) func(*Model, []entity) bool {
 	return func(m *Model, sel []entity) bool {
-		if _, why := sourcesFor(v, sel); why != "" {
+		if _, why := sourcesFor(v, sel, m.status); why != "" {
 			return false
 		}
-		return v != verbCommit || hasUncommitted(m)
+		return v != verbCommit || uncommittedIn(m, sel[0].worktree)
 	}
+}
+
+// inWorkspace reports whether nothing selected lives in a worktree, for actions only the workspace has.
+func inWorkspace(es []entity) bool {
+	for _, e := range es {
+		if e.worktree != "" {
+			return false
+		}
+	}
+	return true
 }
 
 var actions []action
@@ -85,6 +95,12 @@ func init() {
 			run: (*Model).toggleResolvedComments},
 		{title: "Review comments…", group: "Review", global: true, when: hasReview, run: (*Model).commentsPicker},
 
+		// Worktrees, before the commit actions whose keys they reuse on a worktree.
+		{key: "o", title: "Open a shell in the worktree", group: "Worktree", hint: "shell", when: one(entWorktree), run: (*Model).openWorktreeShell},
+		{key: "S", title: "Archive worktree", group: "Worktree", when: one(entWorktree), run: (*Model).archiveWorktree},
+		{key: "x", title: "Remove worktree…", group: "Worktree", when: one(entWorktree), run: (*Model).removeWorktree},
+		{key: "w", title: "New worktree…", group: "Worktree", global: true, when: always, run: (*Model).newWorktree},
+
 		// Changes and commits.
 		{key: "c", title: "Commit…", group: "Commit", when: verbAvailable(verbCommit),
 			run: func(m *Model, sel []entity) tea.Cmd { return m.enterTarget(verbCommit, sel) }},
@@ -92,22 +108,27 @@ func init() {
 			run: func(m *Model, sel []entity) tea.Cmd { return m.enterTarget(verbSquash, sel) }},
 		{key: "R", title: "Amend all changes into this", group: "Commit",
 			when: func(m *Model, sel []entity) bool {
-				return one(entCommit, entBranch)(m, sel) && hasUncommitted(m) && (sel[0].kind == entCommit || m.branchHasCommits(sel[0]))
+				return one(entCommit, entBranch)(m, sel) && uncommittedIn(m, sel[0].worktree) && (sel[0].kind == entCommit || m.branchHasCommits(sel[0]))
 			},
 			run: func(m *Model, sel []entity) tea.Cmd {
 				t := sel[0]
+				var ids []string // all of the workspace's
+				if t.worktree != "" {
+					ids = m.worktreeChanges(t.worktree)
+				}
 				return m.runOp("Amend all changes into "+t.describe(), keepSelection, func(ctx context.Context, c *but.Client) error {
-					return c.Amend(ctx, t.id, nil)
+					return c.Amend(ctx, t.id, ids)
 				})
 			}},
 		{key: "A", title: "Absorb into matching commits", group: "Commit",
 			when: func(m *Model, sel []entity) bool {
-				return hasUncommitted(m) && any_(entArea, entDir, entFile, entHunk)(m, sel)
+				// `but` 0.23.4 can't absorb in a worktree yet.
+				return hasUncommitted(m) && any_(entArea, entDir, entFile, entHunk)(m, sel) && inWorkspace(sel)
 			},
 			run: (*Model).absorb},
 		{key: "n", title: "Insert empty commit", group: "Commit", when: one(entBranch, entCommit),
 			run: func(m *Model, sel []entity) tea.Cmd {
-				at := but.Placement{Branch: sel[0].branch}
+				at := but.Placement{Branch: sel[0].branchRef()}
 				if sel[0].kind == entCommit {
 					at = but.Placement{Above: sel[0].id}
 				}
@@ -122,7 +143,7 @@ func init() {
 			}},
 		{key: "x", title: "Discard…", group: "Commit",
 			when: func(m *Model, sel []entity) bool {
-				return len(sel) > 0 && !allOf(sel, entNewBranch) && (sel[0].kind != entArea || hasUncommitted(m))
+				return len(sel) > 0 && !allOf(sel, entNewBranch) && !allOf(sel, entWorktree) && (sel[0].kind != entArea || hasUncommitted(m))
 			},
 			run: (*Model).discard},
 
@@ -151,28 +172,28 @@ func init() {
 		{key: "P", title: "Push branch", group: "Branch", when: one(entBranch, entCommit), run: (*Model).push},
 		{key: "N", title: "Create pull request", group: "Branch", when: one(entBranch),
 			run: func(m *Model, sel []entity) tea.Cmd {
-				b := sel[0].branch
+				b, ref := sel[0].branch, sel[0].branchRef()
 				return m.runOp("Create pull request for "+b, keepSelection, func(ctx context.Context, c *but.Client) error {
-					return syncPRs(ctx, c, c.PRNew(ctx, b, "", false))
+					return syncPRs(ctx, c, c.PRNew(ctx, ref, "", false))
 				})
 			}},
 		{key: "o", title: "Open pull request", group: "Branch", hint: "open PR",
 			when: func(m *Model, sel []entity) bool { return one(entBranch)(m, sel) && m.branchPR(sel[0]) != "" },
 			run:  (*Model).openPR},
 		{key: "a", title: "Apply branch…", group: "Branch", global: true, when: always, run: (*Model).applyPicker},
-		{key: "S", title: "Unapply stack", group: "Branch", when: one(entBranch, entCommit),
+		{key: "S", title: "Unapply stack", group: "Branch", when: func(m *Model, sel []entity) bool { return one(entBranch, entCommit)(m, sel) && inWorkspace(sel) },
 			run: func(m *Model, sel []entity) tea.Cmd {
 				b := sel[0].branch
 				return m.runOp("Unapply "+b, keepSelection, func(ctx context.Context, c *but.Client) error { return c.Unapply(ctx, b) })
 			}},
 		{key: "", title: "Land branch onto target…", group: "Branch", when: one(entBranch),
 			run: func(m *Model, sel []entity) tea.Cmd {
-				b := sel[0].branch
+				b, ref := sel[0].branch, sel[0].branchRef()
 				m.openModal(&confirmModal{title: "Land " + b + "?", yesLabel: "land",
 					body: "Merges " + b + " straight into the target branch and pushes it.",
 					onYes: func(m *Model) tea.Cmd {
 						return m.runOp("Land "+b, selectArea, func(ctx context.Context, c *but.Client) error {
-							_, err := c.Exec(ctx, "land", b, "--yes")
+							_, err := c.Exec(ctx, "land", ref, "--yes")
 							return err
 						})
 					}})
@@ -230,7 +251,7 @@ func init() {
 				}
 				return m.notify(toastInfo, "Opened "+sel[0].label)
 			}},
-		{key: "y", title: "Copy", group: "View", when: one(entBranch, entCommit, entFile, entCommittedFile, entHunk), run: (*Model).copyQuick},
+		{key: "y", title: "Copy", group: "View", when: one(entBranch, entCommit, entFile, entCommittedFile, entHunk, entWorktree), run: (*Model).copyQuick},
 		{key: "Y", title: "Copy…", group: "View", when: one(entBranch, entCommit, entFile, entCommittedFile, entHunk), run: (*Model).copyPicker},
 		{key: "v", title: "Select a range of lines", group: "View", when: detailsLines,
 			run: func(m *Model, _ []entity) tea.Cmd { m.det.toggleRange(m.hunkMarks()); return nil }},
@@ -328,7 +349,7 @@ func (m *Model) contextMenu(sel []entity) tea.Cmd {
 
 func (m *Model) helpPalette(sel []entity) tea.Cmd {
 	var items []pickItem
-	for _, g := range []string{"Commit", "Conflicts", "Branch", "History", "Review", "View"} {
+	for _, g := range []string{"Commit", "Conflicts", "Branch", "Worktree", "History", "Review", "View"} {
 		for _, a := range actions {
 			if a.group != g {
 				continue
@@ -347,7 +368,7 @@ func (m *Model) helpPalette(sel []entity) tea.Cmd {
 
 // enterTarget starts picking a target for verb v with the given subjects.
 func (m *Model) enterTarget(v verb, sel []entity) tea.Cmd {
-	srcs, why := sourcesFor(v, sel)
+	srcs, why := sourcesFor(v, sel, m.status)
 	if why != "" {
 		return m.notify(toastInfo, why)
 	}
@@ -376,20 +397,16 @@ func (m *Model) branchPR(e entity) string {
 	if m.status == nil {
 		return ""
 	}
-	for _, st := range m.status.Stacks {
-		for _, b := range st.Branches {
-			if b.Name == e.branch {
-				return b.PR()
-			}
-		}
+	if b := m.status.Branch(e.branch); b != nil {
+		return b.PR()
 	}
 	return ""
 }
 
 func (m *Model) openPR(sel []entity) tea.Cmd {
-	client, branch, pr := m.client, sel[0].branch, m.branchPR(sel[0])
+	client, branch, ref, pr := m.client, sel[0].branch, sel[0].branchRef(), m.branchPR(sel[0])
 	return func() tea.Msg {
-		url, err := client.ReviewURL(context.Background(), branch)
+		url, err := client.ReviewURL(context.Background(), ref)
 		return prURLMsg{branch: branch, pr: pr, url: url, err: err}
 	}
 }
@@ -509,12 +526,19 @@ func (m *Model) absorb(sel []entity) tea.Cmd {
 }
 
 func (m *Model) newBranch(sel []entity) tea.Cmd {
-	if len(sel) == 1 && len(m.marks) == 0 && (sel[0].kind == entBranch || sel[0].kind == entCommit) {
-		b := sel[0].branch
-		for _, l := range m.lanes {
-			for _, e := range l.items {
-				if e.kind == entBranch && e.branch == b {
-					return m.promptNewBranch(but.Placement{Above: e.id}, "stacked on "+b)
+	if len(sel) == 1 && len(m.marks) == 0 {
+		e := sel[0]
+		// A worktree holds one stack, so anything in it stacks the new branch on its top branch.
+		if wt := m.status.Worktree(e.worktree); wt != nil && e.kind != entBranch && e.kind != entCommit && len(wt.Branches) > 0 {
+			top := wt.Branches[0]
+			return m.promptNewBranch(but.Placement{Above: top.CliID}, "stacked on "+top.Name+" in worktree "+wt.Name)
+		}
+		if e.kind == entBranch || e.kind == entCommit {
+			for _, l := range m.lanes {
+				for _, b := range l.items {
+					if b.kind == entBranch && b.branch == e.branch {
+						return m.promptNewBranch(but.Placement{Above: b.id}, "stacked on "+e.branch)
+					}
 				}
 			}
 		}
@@ -533,12 +557,12 @@ func (m *Model) promptNewBranch(at but.Placement, where string) tea.Cmd {
 }
 
 func (m *Model) push(sel []entity) tea.Cmd {
-	b := sel[0].branch
+	b, ref := sel[0].branch, sel[0].branch
 	status := ""
 	for _, l := range m.lanes {
 		for _, e := range l.items {
 			if e.kind == entBranch && e.branch == b {
-				status = e.status
+				status, ref = e.status, e.branchRef() // a commit's entity has no branch id
 			}
 		}
 	}
@@ -547,7 +571,7 @@ func (m *Model) push(sel []entity) tea.Cmd {
 	}
 	run := func(m *Model, force bool) tea.Cmd {
 		return m.runOp("Push "+b, keepSelection, func(ctx context.Context, c *but.Client) error {
-			return syncPRs(ctx, c, c.Push(ctx, b, force))
+			return syncPRs(ctx, c, c.Push(ctx, ref, force))
 		})
 	}
 	if status == "unpushedCommitsRequiringForce" {
@@ -682,7 +706,12 @@ func (m *Model) pathOf(e entity) string {
 	if e.kind == entHunk {
 		p, _, _ = strings.Cut(e.label, " ")
 	}
-	if m.client.Dir == "" || strings.HasPrefix(p, "/") {
+	switch {
+	case e.kind == entWorktree:
+		return e.dir
+	case e.dir != "":
+		return e.dir + "/" + p
+	case m.client.Dir == "" || strings.HasPrefix(p, "/"):
 		return p
 	}
 	return m.client.Dir + "/" + p
@@ -703,6 +732,8 @@ func (m *Model) copyQuick(sel []entity) tea.Cmd {
 		if h, ok := m.det.selectedHunk(); ok {
 			text = h.text
 		}
+	case entWorktree:
+		text = e.dir
 	}
 	return tea.Batch(tea.SetClipboard(text), m.notify(toastSuccess, "Copied "+firstLines(text, 1)))
 }
@@ -752,6 +783,8 @@ func (m *Model) gotoPicker([]entity) tea.Cmd {
 	for _, l := range m.lanes {
 		for _, e := range l.items {
 			switch e.kind {
+			case entWorktree:
+				items = append(items, pickItem{label: worktreeGlyph + " " + e.label, detail: e.id, value: e})
 			case entBranch:
 				items = append(items, pickItem{label: "⑂ " + e.branch, detail: e.id, value: e})
 			case entCommit:

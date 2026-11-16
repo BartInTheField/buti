@@ -17,33 +17,37 @@ const (
 	entCommittedFile            // file inside a commit
 	entNewBranch                // the "new branch" drop lane, only a target
 	entConflict                 // file of the commit in edit mode, with or without conflict markers
+	entWorktree                 // a linked worktree: stands for its uncommitted changes, like entArea for the workspace
 )
 
 func (k entityKind) String() string {
-	return [...]string{"nothing", "all changes", "directory", "file", "hunk", "branch", "commit", "committed file", "new branch", "conflicted file"}[k]
+	return [...]string{"nothing", "all changes", "directory", "file", "hunk", "branch", "commit", "committed file", "new branch", "conflicted file", "worktree"}[k]
 }
 
 // uncommitted reports whether the entity is (a set of) uncommitted changes.
 func (k entityKind) uncommitted() bool {
-	return k == entArea || k == entDir || k == entFile || k == entHunk
+	return k == entArea || k == entDir || k == entFile || k == entHunk || k == entWorktree
 }
 
 // entity is anything that can be selected, marked, or be the source or target of an operation.
 type entity struct {
 	kind  entityKind
 	id    string   // CLI id; "@" for the area
-	ids   []string // CLI ids of the files below, for directories
+	ids   []string // CLI ids of the files below, for directories and worktrees
 	label string   // human readable: path, branch name or commit subject
 
 	branch string      // owning (or own) branch name, for branches, commits and committed files
 	stack  string      // owning stack CLI id
 	commit *but.Commit // for commits, and the parent commit of committed files
 	status string      // branch status, for branches; "conflicted" or "resolved" for conflicted files
+
+	worktree string // the linked worktree it lives in, by name; "" for the workspace
+	dir      string // that worktree's directory
 }
 
 // cliIDs returns the ids to pass to `but` for this entity.
 func (e entity) cliIDs() []string {
-	if e.kind == entDir {
+	if e.kind == entDir || e.kind == entWorktree {
 		return e.ids
 	}
 	if e.id == "" {
@@ -54,9 +58,23 @@ func (e entity) cliIDs() []string {
 
 func (e entity) valid() bool { return e.kind != entNone }
 
+// branchRef names the entity's branch to `but`. In a worktree that is the branch's CLI id: once a branch is stacked
+// there, `but` 0.23.4 finds the worktree's bottom branch name ambiguous ("Ambiguous branch identifier 'search'").
+func (e entity) branchRef() string {
+	if e.worktree != "" && e.kind == entBranch {
+		return e.id
+	}
+	return e.branch
+}
+
 // key identifies the entity across reloads, where CLI ids may shift.
 func (e entity) key() string {
+	if e.worktree != "" && (e.kind == entFile || e.kind == entDir) {
+		return "wt:" + e.worktree + ":" + e.kind.String() + ":" + e.label // the same path can change in the workspace too
+	}
 	switch e.kind {
+	case entWorktree:
+		return "worktree:" + e.label
 	case entArea, entNewBranch:
 		return e.kind.String()
 	case entBranch:
@@ -106,6 +124,8 @@ func (e entity) describe() string {
 		return "commit “" + e.label + "”"
 	case entBranch:
 		return "branch " + e.label
+	case entWorktree:
+		return "worktree " + e.label
 	case entNone:
 		return "nothing"
 	}

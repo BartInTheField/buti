@@ -9,12 +9,15 @@ import (
 	"github.com/bartinthefield/buti/internal/but"
 )
 
-// lane is one column of the workspace: a stack of branches. items lists every
-// selectable entity in top-to-bottom render order.
+// lane is one column of the workspace: a stack of branches, or a linked worktree.
+// items lists every selectable entity in top-to-bottom render order.
 type lane struct {
 	stack   but.Stack
 	items   []entity
 	phantom bool // the "new branch" drop lane
+
+	wt     *but.Worktree // set for a worktree's lane, whose stack holds the worktree's branches
+	wtBase string        // where the worktree's branch starts, e.g. "on api"
 }
 
 func buildLanes(s *but.Status, showFiles func(*but.Commit) bool) []lane {
@@ -24,21 +27,33 @@ func buildLanes(s *but.Status, showFiles func(*but.Commit) bool) []lane {
 		for _, c := range st.AssignedChanges {
 			l.items = append(l.items, entity{kind: entFile, id: c.CliID, label: c.FilePath, stack: st.CliID})
 		}
-		for _, b := range st.Branches {
-			l.items = append(l.items, entity{kind: entBranch, id: b.CliID, label: b.Name, branch: b.Name, stack: st.CliID, status: b.BranchStatus})
-			for ci := range b.Commits {
-				c := &b.Commits[ci]
-				l.items = append(l.items, entity{kind: entCommit, id: c.CliID, label: c.Subject(), branch: b.Name, stack: st.CliID, commit: c})
-				if showFiles(c) {
-					for _, f := range c.Changes {
-						l.items = append(l.items, entity{kind: entCommittedFile, id: f.CliID, label: f.FilePath, branch: b.Name, stack: st.CliID, commit: c})
-					}
-				}
-			}
-		}
+		l.addBranches(showFiles, entity{stack: st.CliID})
 		lanes = append(lanes, l)
 	}
 	return lanes
+}
+
+// addBranches lists the lane's branches with their commits and shown files. Every item starts from base, which
+// carries what they share: the stack, and the worktree they live in.
+func (l *lane) addBranches(showFiles func(*but.Commit) bool, base entity) {
+	for _, b := range l.stack.Branches {
+		e := base
+		e.kind, e.id, e.label, e.branch, e.status = entBranch, b.CliID, b.Name, b.Name, b.BranchStatus
+		l.items = append(l.items, e)
+		for ci := range b.Commits {
+			c := &b.Commits[ci]
+			e := base
+			e.kind, e.id, e.label, e.branch, e.commit = entCommit, c.CliID, c.Subject(), b.Name, c
+			l.items = append(l.items, e)
+			if showFiles(c) {
+				for _, f := range c.Changes {
+					e := base
+					e.kind, e.id, e.label, e.branch, e.commit = entCommittedFile, f.CliID, f.FilePath, b.Name, c
+					l.items = append(l.items, e)
+				}
+			}
+		}
+	}
 }
 
 func phantomLane() lane {
@@ -124,38 +139,20 @@ func (l lane) render(width, sel int, deco decoFunc) laneView {
 		return start
 	}
 
-	// Commit box: staged changes (or a hint) and the commit button.
-	var box []string
-	boxItems := map[int]int{}
-	if len(l.stack.AssignedChanges) == 0 {
-		box = append(box, dropStyle.Width(inner).Render("No staged changes"))
-	}
-	for _, c := range l.stack.AssignedChanges {
-		e := l.items[item]
-		d := deco(e)
-		if item == sel {
-			selLine = len(out) + 1 + len(box)
+	if l.wt != nil {
+		block, lineItems, sl := l.worktreeCard(width, sel, deco)
+		start := add(block, 0)
+		for line, it := range lineItems {
+			hits[start+line] = it
 		}
-		letter, st := changeTypeStyle(c.ChangeType)
-		prefix := ""
-		if d.marked {
-			prefix = markGlyph + " "
+		if sl >= 0 {
+			selLine = start + sl
 		}
-		boxItems[len(box)] = item
-		box = append(box, dimmed(fileLine(prefix, c.FilePath, withCount(st.Render(letter), d.comments), inner, item == sel), d))
-		item++
+		item = 1 + len(l.wt.UncommittedChanges)
+	} else {
+		l.renderCommitBox(width, sel, deco, &out, &hits, &selLine)
+		item = len(l.stack.AssignedChanges)
 	}
-	box = append(box, buttonStyle.Width(inner).Align(lipgloss.Center).Render("Start a commit…"))
-	start := add(cardStyle.Width(width).Render(strings.Join(box, "\n")), -1)
-	for line, it := range boxItems {
-		hits[start+1+line] = it
-	}
-	// The commit button starts a commit into this lane.
-	buttonLine := 0
-	for _, b := range box[:len(box)-1] {
-		buttonLine += lipgloss.Height(b)
-	}
-	hits[start+1+buttonLine] = startCommitHit
 
 	for bi, b := range l.stack.Branches {
 		if bi > 0 {
@@ -274,6 +271,46 @@ func (l lane) render(width, sel int, deco decoFunc) laneView {
 		hits[start+1+pushLine] = pushHitBase - branchItem
 	}
 	return laneView{lines: out, items: hits, selLine: selLine}
+}
+
+// renderCommitBox draws a stack's staged changes (or a hint) and its commit button.
+func (l lane) renderCommitBox(width, sel int, deco decoFunc, out *[]string, hits *[]int, selLine *int) {
+	inner := width - 4
+	var box []string
+	boxItems := map[int]int{}
+	if len(l.stack.AssignedChanges) == 0 {
+		box = append(box, dropStyle.Width(inner).Render("No staged changes"))
+	}
+	for _, c := range l.stack.AssignedChanges {
+		item := len(boxItems)
+		e := l.items[item]
+		d := deco(e)
+		if item == sel {
+			*selLine = len(*out) + 1 + len(box)
+		}
+		letter, st := changeTypeStyle(c.ChangeType)
+		prefix := ""
+		if d.marked {
+			prefix = markGlyph + " "
+		}
+		boxItems[len(box)] = item
+		box = append(box, dimmed(fileLine(prefix, c.FilePath, withCount(st.Render(letter), d.comments), inner, item == sel), d))
+	}
+	box = append(box, buttonStyle.Width(inner).Align(lipgloss.Center).Render("Start a commit…"))
+	start := len(*out)
+	for _, line := range strings.Split(cardStyle.Width(width).Render(strings.Join(box, "\n")), "\n") {
+		*out = append(*out, line)
+		*hits = append(*hits, -1)
+	}
+	for line, it := range boxItems {
+		(*hits)[start+1+line] = it
+	}
+	// The commit button starts a commit into this lane.
+	buttonLine := 0
+	for _, b := range box[:len(box)-1] {
+		buttonLine += lipgloss.Height(b)
+	}
+	(*hits)[start+1+buttonLine] = startCommitHit
 }
 
 // Special hit values for buttons, below every item index.

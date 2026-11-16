@@ -77,6 +77,8 @@ func diffTarget(e entity) (id, prefix string, ok bool) {
 	switch e.kind {
 	case entArea:
 		return "", "", true
+	case entWorktree:
+		return "", "", e.dir != "" // every uncommitted change, run in the worktree
 	case entDir:
 		return "", e.label, true
 	case entFile, entHunk, entBranch, entCommit, entCommittedFile:
@@ -111,6 +113,9 @@ func (d *details) sync(c *but.Client, e entity, force bool) tea.Cmd {
 		return nil
 	}
 	d.loading = true
+	if e.kind == entWorktree {
+		c = c.In(e.dir)
+	}
 	return func() tea.Msg {
 		diff, err := c.Diff(context.Background(), id)
 		if err == nil && prefix != "" {
@@ -680,10 +685,15 @@ func (d *details) hunkEntity() (entity, bool) {
 	if !ok || h.id == "" || !d.ent.kind.uncommitted() {
 		return entity{}, false
 	}
-	return entity{kind: entHunk, id: h.id, label: h.path + " " + strings.SplitN(h.text, "\n", 2)[0]}, true
+	return entity{kind: entHunk, id: h.id, label: h.path + " " + strings.SplitN(h.text, "\n", 2)[0], worktree: d.ent.worktree, dir: d.ent.dir}, true
 }
 
 func commitHeader(e entity) []string {
+	if e.kind == entWorktree {
+		label := mutedStyle.Width(12).Render
+		return []string{label("Worktree") + worktreeStyle.Render(worktreeGlyph+" "+e.label), label("Path") + e.dir,
+			"", mutedStyle.Render(pluralize(len(e.ids), "uncommitted change")) + mutedStyle.Render(" · o opens a shell there"), ""}
+	}
 	if e.kind != entCommit || e.commit == nil {
 		return nil
 	}
