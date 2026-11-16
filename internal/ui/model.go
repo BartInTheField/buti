@@ -1089,7 +1089,7 @@ func (m *Model) lanesView() string {
 		off := scrollOffset(len(lv.lines), lv.selLine, h)
 		visibleLines := lv.lines[off:min(off+h, len(lv.lines))]
 		div := dividerStyle
-		if i == f-1 {
+		if i == f-1 && f < len(m.lanes) {
 			div = lipgloss.NewStyle().Foreground(colorWorktree) // where the worktrees start
 		}
 		cols = append(cols, lipgloss.NewStyle().Width(lw).Height(h).Render(strings.Join(visibleLines, "\n")),
