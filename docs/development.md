@@ -65,5 +65,11 @@ fresh test repository:
   `N` counts the releases of that (UTC) day: `2026.09.26.1`, `2026.09.26.2`, ... The version is baked in with
   `-ldflags "-X main.version=..."`; builds without it report `dev` and never check for updates. Each release also
   carries `buti-zed-extension_<version>.tar.gz`, the Zed extension as Zed loads it (`extension.toml` and
-  `extension.wasm`).
+  `extension.wasm`). Every release file has a [build provenance attestation](https://docs.github.com/en/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds),
+  so you can check that the release workflow built it:
+
+  ```sh
+  gh attestation verify buti_<version>_linux_amd64.tar.gz --repo BartInTheField/buti \
+    --signer-workflow BartInTheField/buti/.github/workflows/release.yml
+  ```
 - `install.sh` downloads the latest release for the current platform.

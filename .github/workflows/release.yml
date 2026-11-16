@@ -111,6 +111,11 @@ jobs:
   release:
     needs: [version, build, zed-extension]
     runs-on: ubuntu-latest
+    # id-token and attestations let actions/attest sign the files, so `gh attestation verify` can prove this workflow built them.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -119,6 +124,9 @@ jobs:
           merge-multiple: true
       - name: Checksums
         run: cd dist && sha256sum * > checksums.txt
+      - uses: actions/attest@v4
+        with:
+          subject-path: dist/*
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
