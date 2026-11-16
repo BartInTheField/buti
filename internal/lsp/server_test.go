@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -171,6 +172,37 @@ func (c *client) diagnostics(path string, want func([]diagnostic) bool) []diagno
 	return p.Diagnostics
 }
 
+// lenses asks for the code lenses of path.
+func (c *client) lenses(path string) []codeLens {
+	c.t.Helper()
+	m := c.request("textDocument/codeLens", map[string]any{"textDocument": map[string]any{"uri": pathToURI(path)}})
+	var ls []codeLens
+	if m.Error != nil || json.Unmarshal(m.Result, &ls) != nil {
+		c.t.Fatalf("codeLens: %+v %s", m.Error, m.Result)
+	}
+	return ls
+}
+
+// A lens shows the comment's first line, cut by characters rather than bytes, and says when there is more.
+func TestLensTitle(t *testing.T) {
+	sixty := strings.Repeat("é", lensWidth)
+	for _, tc := range []struct {
+		body    string
+		replies int
+		want    string
+	}{
+		{"short", 0, "💬 short"},
+		{sixty, 0, "💬 " + sixty},
+		{sixty + "x", 0, "💬 " + sixty[:len("é")*(lensWidth-1)] + "…"},
+		{"first line\nsecond line", 2, "💬 first line… · 2 replies"},
+	} {
+		l := review.Located{Comment: review.Comment{Body: tc.body, Replies: make([]review.Reply, tc.replies)}}
+		if got := lensTitle(l); got != tc.want {
+			t.Errorf("%q: got %q, want %q", tc.body, got, tc.want)
+		}
+	}
+}
+
 func TestSession(t *testing.T) {
 	root := t.TempDir()
 	for name, text := range fileText {
@@ -200,10 +232,12 @@ func TestSession(t *testing.T) {
 	c := startServer(t, open, "/fallback")
 	aGo, bGo := filepath.Join(root, "a.go"), filepath.Join(root, "b.go")
 
-	init := c.request("initialize", map[string]any{"processId": nil, "rootUri": pathToURI(root), "capabilities": map[string]any{}})
+	init := c.request("initialize", map[string]any{"processId": nil, "rootUri": pathToURI(root), "capabilities": map[string]any{
+		"workspace": map[string]any{"codeLens": map[string]any{"refreshSupport": true}}}})
 	var initResult struct {
 		Capabilities struct {
-			CodeActionProvider     bool `json:"codeActionProvider"`
+			CodeActionProvider     bool      `json:"codeActionProvider"`
+			CodeLensProvider       *struct{} `json:"codeLensProvider"`
 			ExecuteCommandProvider struct {
 				Commands []string `json:"commands"`
 			} `json:"executeCommandProvider"`
@@ -217,7 +251,8 @@ func TestSession(t *testing.T) {
 	}
 	if err := json.Unmarshal(init.Result, &initResult); err != nil || !initResult.Capabilities.CodeActionProvider ||
 		initResult.Capabilities.TextDocumentSync.Change != 1 || initResult.ServerInfo.Name != "buti" ||
-		len(initResult.Capabilities.ExecuteCommandProvider.Commands) != 2 {
+		initResult.Capabilities.CodeLensProvider == nil ||
+		len(initResult.Capabilities.ExecuteCommandProvider.Commands) != 3 {
 		t.Fatalf("initialize: %s (%v)", init.Result, err)
 	}
 	c.notify("initialized", map[string]any{})
@@ -239,6 +274,24 @@ func TestSession(t *testing.T) {
 		t.Fatalf("b.go: %+v", got)
 	}
 
+	// The comments are code lenses too, which the client is told to ask for again.
+	c.note("workspace/codeLens/refresh", nil)
+	lenses := c.lenses(aGo)
+	if len(lenses) != 3 || lenses[0].Command.Title != "💬 agent: [must-fix] handle errors · 1 reply" ||
+		lenses[0].Command.Command != cmdComment || lenses[0].Command.Arguments[0] != mustFix.ID ||
+		lenses[1].Command.Title != "Resolve" || lenses[1].Command.Command != cmdResolve || lenses[1].Command.Arguments[0] != mustFix.ID ||
+		lenses[2].Command.Title != "Dismiss" || lenses[2].Command.Command != cmdDismiss {
+		t.Fatalf("lenses: %+v", lenses)
+	}
+	for _, l := range lenses {
+		if l.Range.Start != (position{Line: 2}) {
+			t.Fatalf("lens at %+v, want line 2", l.Range)
+		}
+	}
+	if m := c.request("workspace/executeCommand", map[string]any{"command": cmdComment, "arguments": []any{mustFix.ID}}); m.Error != nil {
+		t.Fatalf("clicking the comment's lens: %+v", m.Error)
+	}
+
 	// Editing moves the diagnostic with the text, without asking `but`.
 	before := src.statuses.Load()
 	c.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{
@@ -252,6 +305,9 @@ func TestSession(t *testing.T) {
 	}
 	if n := src.statuses.Load(); n != before {
 		t.Fatalf("didChange ran but status %d times", n-before)
+	}
+	if lenses := c.lenses(aGo); len(lenses) != 3 || lenses[0].Range.Start.Line != 3 {
+		t.Fatalf("lenses after change: %+v", lenses)
 	}
 
 	// A burst of saves refreshes once.
@@ -293,6 +349,10 @@ func TestSession(t *testing.T) {
 	}
 	if got := c.diagnostics(aGo, func(d []diagnostic) bool { return len(d) == 0 }); len(got) != 0 {
 		t.Fatalf("after resolve: %+v", got)
+	}
+	c.note("workspace/codeLens/refresh", nil)
+	if lenses := c.lenses(aGo); len(lenses) != 0 {
+		t.Fatalf("lenses after resolve: %+v", lenses)
 	}
 	if cm, err := store.Get(mustFix.ID); err != nil || cm.Status != review.StatusResolved || cm.Resolution.Summary != "resolved in editor" {
 		t.Fatalf("stored: %+v, %v", cm, err)

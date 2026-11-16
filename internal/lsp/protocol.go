@@ -48,6 +48,13 @@ type initializeParams struct {
 	RootURI          string            `json:"rootUri"`
 	RootPath         string            `json:"rootPath"`
 	WorkspaceFolders []workspaceFolder `json:"workspaceFolders"`
+	Capabilities     struct {
+		Workspace struct {
+			CodeLens struct {
+				RefreshSupport bool `json:"refreshSupport"`
+			} `json:"codeLens"`
+		} `json:"workspace"`
+	} `json:"capabilities"`
 }
 
 type textDocumentItem struct {
@@ -100,6 +107,15 @@ type codeAction struct {
 	Kind        string       `json:"kind"`
 	Diagnostics []diagnostic `json:"diagnostics,omitempty"`
 	Command     command      `json:"command"`
+}
+
+type codeLensParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+}
+
+type codeLens struct {
+	Range   lspRange `json:"range"`
+	Command command  `json:"command"`
 }
 
 type executeCommandParams struct {
