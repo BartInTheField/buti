@@ -70,6 +70,6 @@ fresh test repository:
 
   ```sh
   gh attestation verify buti_<version>_linux_amd64.tar.gz --repo BartInTheField/buti \
-    --signer-workflow BartInTheField/buti/.github/workflows/release.yml
+    --signer-workflow BartInTheField/buti/.github/workflows/release.yml --source-ref refs/heads/main
   ```
 - `install.sh` downloads the latest release for the current platform.
