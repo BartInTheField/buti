@@ -23,6 +23,7 @@ func TestOldContent(t *testing.T) {
 		{"modified", "a\nB\nc\n", "a\nb\nc\n", []but.Hunk{hunk(1, 3, 1, 3, " a\n-b\n+B\n c\n")}},
 		{"added file", "x\ny\n", "", []but.Hunk{hunk(0, 0, 1, 2, "+x\n+y\n")}},
 		{"deleted file", "", "x\ny\n", []but.Hunk{hunk(1, 2, 0, 0, "-x\n-y\n")}},
+		{"deleted file, as but writes it", "", "x\ny\n", []but.Hunk{hunk(1, 2, 1, 0, "-x\n-y\n")}},
 		{"multi hunk", "1\nTWO\n3\n4\n5\n6\nSEVEN\n8\n", "1\n2\n3\n4\n5\n6\n7\n8\n", []but.Hunk{
 			hunk(1, 3, 1, 3, " 1\n-2\n+TWO\n 3\n"), hunk(6, 3, 6, 3, " 6\n-7\n+SEVEN\n 8\n")}},
 		{"hunks out of order", "A\nb\nc\nD\n", "a\nb\nc\nd\n", []but.Hunk{

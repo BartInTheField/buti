@@ -50,6 +50,9 @@ func OldContent(newContent string, hunks []but.Hunk) (string, error) {
 		start := h.NewStart - 1
 		if h.NewLines == 0 {
 			start = h.NewStart // the line before the hunk, for a pure deletion
+			if len(lines) == 0 {
+				start = 0 // `but` writes an emptied or deleted file as +1,0 where git writes +0,0
+			}
 		}
 		start = max(start, 0)
 		if start < at || start > len(lines) {
