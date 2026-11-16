@@ -94,7 +94,9 @@ func TestWorktreeDividerOnlyWithWorktrees(t *testing.T) {
 	}
 	h = newHarnessWith(t, worktreeStatus())
 	h.send(tea.WindowSizeMsg{Width: 220, Height: 36})
-	if !strings.Contains(h.m.View().Content, blue) {
-		t.Fatal("no worktree colour on screen with a worktree")
+	// Worktree cards have blue borders too, but only the divider reaches the bottom lane row.
+	lines := strings.Split(h.m.View().Content, "\n")
+	if bottom := lines[len(lines)-2]; !strings.Contains(bottom, blue+"m│") {
+		t.Fatalf("no worktree divider on the bottom lane row:\n%s", h.screen())
 	}
 }
